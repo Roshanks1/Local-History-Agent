@@ -14,6 +14,26 @@ from offline_reader import OfflineReader
 from retrieval_config import load_config
 
 
+PREVIEW_MAX_CHARS = 280
+
+
+def preview_excerpt(value, limit=PREVIEW_MAX_CHARS):
+    """Return a compact plain-text excerpt without changing persisted evidence."""
+    if not isinstance(value, str):
+        return None
+    text = ' '.join(value.split()).strip()
+    if not text:
+        return None
+    if len(text) <= limit:
+        return text
+    clipped = text[:limit + 1]
+    sentence_end = max(clipped.rfind('. '), clipped.rfind('? '), clipped.rfind('! '))
+    if sentence_end >= max(80, limit // 2):
+        return clipped[:sentence_end + 1] + '…'
+    word_end = clipped.rfind(' ', 0, limit + 1)
+    return clipped[:word_end if word_end >= 80 else limit].rstrip() + '…'
+
+
 class Application:
     def __init__(self, reader, answer=ask, store_path=None):
         from conversation_store import ConversationStore
@@ -26,11 +46,14 @@ class Application:
 
     def source_links(self, result):
         result = dict(result)
-        result['sources'] = [dict(source) for source in result['sources']]
+        result['sources'] = [dict(source) for source in result.get('sources') or []]
         for source in result['sources']:
+            evidence = source.get('supplied_text')
+            source['article_title'] = str(source.get('article_title') or
+                                          source.get('article_path', '')).replace('_', ' ')
+            source['preview_excerpt'] = preview_excerpt(evidence)
             try:
                 fallback = self.reader.link(source['article_path'], source.get('section'), source.get('subsection'))
-                evidence = source.get('supplied_text')
                 if evidence and self.reader.has_evidence(source['article_path'], evidence):
                     citation = secrets.token_urlsafe(18)
                     article_path = urlsplit(fallback).path
@@ -38,10 +61,16 @@ class Application:
                     if len(self.citations) > 512:
                         self.citations.popitem(last=False)
                     source['article_url'] = article_path + '?citation=' + citation + '#cited-evidence'
+                    source['evidence_status'] = 'exact'
                 else:
                     source['article_url'] = fallback
+                    source['evidence_status'] = 'section' if urlsplit(fallback).fragment else 'article'
             except (KeyError, ValueError, RuntimeError):
                 source['article_url'] = None
+                source['evidence_status'] = 'unavailable'
+            # The UI needs only the bounded excerpt, not the full generation chunk.
+            source.pop('supplied_text', None)
+            source.pop('text', None)
         return result
 
     def run(self, data):

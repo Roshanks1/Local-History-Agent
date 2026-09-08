@@ -1,6 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let session = null, token = null, conversations = [], pendingArchive = null;
+let previewSequence = 0;
 
 function element(tag, text, cls) {
  const value=document.createElement(tag); value.textContent=text;
@@ -21,6 +22,51 @@ async function request(data) {
  }
  return body;
 }
+function sourceSection(source) {
+ return [source.section,source.subsection].filter(Boolean).join(' / ') || 'Article overview';
+}
+function previewElement(source,id) {
+ const preview=element('span','','citation-preview'); preview.id=id; preview.setAttribute('role','tooltip');
+ preview.append(element('strong',source.article_title || source.article_path.replaceAll('_',' ')),element('span',sourceSection(source),'citation-preview-section'));
+ preview.append(element('span',source.preview_excerpt || 'Supporting excerpt unavailable for this saved answer.','citation-preview-excerpt'));
+ return preview;
+}
+function closePreviews(except=null) {
+ for(const wrap of document.querySelectorAll('.citation-wrap')){
+  if(wrap===except)continue;
+  wrap.classList.remove('preview-open'); wrap.classList.add('preview-dismissed');
+  const button=wrap.querySelector('.citation-preview-toggle'); if(button)button.setAttribute('aria-expanded','false');
+ }
+}
+function positionPreview(wrap) {
+ const preview=wrap.querySelector('.citation-preview');
+ requestAnimationFrame(()=>{
+  wrap.classList.remove('preview-below'); preview.style.transform='';
+  const scrollBounds=$('chat-scroll').getBoundingClientRect(), wrapBounds=wrap.getBoundingClientRect();
+  const needed=preview.offsetHeight+12, above=wrapBounds.top-scrollBounds.top, below=scrollBounds.bottom-wrapBounds.bottom;
+  wrap.classList.toggle('preview-below',above<needed && below>above);
+  const bounds=preview.getBoundingClientRect(); let shift=0;
+  if(bounds.right>window.innerWidth-12)shift=window.innerWidth-12-bounds.right;
+  if(bounds.left+shift<12)shift+=12-(bounds.left+shift);
+  if(shift)preview.style.transform=`translateX(${Math.round(shift)}px)`;
+ });
+}
+function activateSource(card,label) {
+ for(const control of card.querySelectorAll('[data-source-label]')){
+  const active=control.dataset.sourceLabel===label;
+  control.classList.toggle('source-active',active);
+  if(active)control.setAttribute('aria-current','true'); else control.removeAttribute('aria-current');
+ }
+}
+function sourceLink(source,text,cls) {
+ const link=element(source.article_url?'a':'div',text,cls);
+ link.dataset.sourceLabel=source.label;
+ if(source.article_url){
+  link.href=source.article_url; link.target='_blank'; link.rel='noopener noreferrer';
+  link.addEventListener('click',()=>activateSource(link.closest('article'),source.label));
+ }
+ return link;
+}
 function answerElement(result) {
  const container=element('div','','answer');
  const sourceByLabel=new Map((result.sources || []).map(source=>[source.label,source]));
@@ -29,7 +75,21 @@ function answerElement(result) {
   container.append(document.createTextNode(result.answer.slice(position,match.index)));
   const label=match[0].slice(1,-1), source=sourceByLabel.get(label);
   if(source?.article_url){
-   const link=element('a',match[0],'inline-citation'); link.href=source.article_url; link.target='_blank'; link.rel='noopener noreferrer'; link.title=`Open evidence from ${source.article_path.replaceAll('_',' ')}`; container.append(link);
+   const wrap=element('span','','citation-wrap');
+   const previewId=`citation-preview-${++previewSequence}`;
+   const link=sourceLink(source,match[0],'inline-citation');
+   link.title=`Open evidence from ${source.article_title}`; link.setAttribute('aria-describedby',previewId);
+   const toggle=element('button','i','citation-preview-toggle'); toggle.type='button';
+   toggle.setAttribute('aria-label',`Preview source ${label}`); toggle.setAttribute('aria-controls',previewId); toggle.setAttribute('aria-expanded','false');
+   toggle.addEventListener('click',event=>{
+    event.preventDefault(); event.stopPropagation(); const opening=!wrap.classList.contains('preview-open');
+    closePreviews(wrap); wrap.classList.toggle('preview-dismissed',!opening); wrap.classList.toggle('preview-open',opening); toggle.setAttribute('aria-expanded',String(opening));
+    if(opening)positionPreview(wrap);
+   });
+   wrap.addEventListener('mouseenter',()=>{wrap.classList.remove('preview-dismissed');positionPreview(wrap);});
+   wrap.addEventListener('focusin',()=>{wrap.classList.remove('preview-dismissed');positionPreview(wrap);});
+   wrap.addEventListener('focusout',()=>setTimeout(()=>{if(!wrap.contains(document.activeElement)){wrap.classList.remove('preview-open');toggle.setAttribute('aria-expanded','false');}},0));
+   wrap.append(link,toggle,previewElement(source,previewId)); container.append(wrap);
   }else container.append(document.createTextNode(match[0]));
   position=match.index+match[0].length;
  }
@@ -37,7 +97,10 @@ function answerElement(result) {
  return container;
 }
 function display(question,result,scroll=true) {
+ const hadMessages=$('conversation').querySelector('article');
  $('welcome')?.remove();
+ const scrollPane=$('chat-scroll');
+ const wasNearLatest=!hadMessages || scrollPane.scrollHeight-scrollPane.scrollTop-scrollPane.clientHeight<80;
  const card=element('article','');
  card.append(element('h2',question),answerElement(result));
  const usage=result.usage;
@@ -45,9 +108,9 @@ function display(question,result,scroll=true) {
  if(result.done_reason==='length')card.append(element('p','Answer reached the output limit and may be incomplete.'));
  const sources=element('div','','sources');
  for(const source of result.sources){
-  const link=element(source.article_url?'a':'div',`[${source.label}] ${source.article_path.replaceAll('_',' ')}`,'source');
-  if(source.article_url){link.href=source.article_url;link.target='_blank';link.rel='noopener noreferrer';}
-  link.append(element('small',source.section+(source.subsection?' / '+source.subsection:'')),element('small',source.article_url?(source.article_url.includes('#')?'Read source section ↗':'Read complete offline article ↗'):'Article unavailable in archive'));
+  const link=sourceLink(source,`[${source.label}] ${source.article_title || source.article_path.replaceAll('_',' ')}`,'source');
+  const destination=source.evidence_status==='exact'?'Read highlighted evidence ↗':source.evidence_status==='section'?'Exact passage unavailable; showing cited section ↗':source.evidence_status==='article'?'Exact passage unavailable; showing article ↗':'Article unavailable in archive';
+  link.append(element('small',sourceSection(source)),element('span',source.preview_excerpt || 'Supporting excerpt unavailable for this saved answer.','source-excerpt'),element('small',destination,'source-destination'));
   sources.append(link);
  }
  card.append(sources);
@@ -57,7 +120,7 @@ function display(question,result,scroll=true) {
   card.append(detail);
  }
  $('conversation').append(card);
- if(scroll)card.scrollIntoView({behavior:'smooth',block:'start'});
+ if(scroll && wasNearLatest)card.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function relativeDate(timestamp) {
  const date=new Date(timestamp*1000), now=new Date();
@@ -90,6 +153,7 @@ async function refreshSaved() {
 async function openSaved(id) {
  const data=await request({action:'open',session:id});
  $('conversation').replaceChildren();
+ $('chat-scroll').scrollTop=0;
  for(const turn of data.turns)display(turn.question,turn.result,false);
  $('question').value=''; $('status').textContent='Conversation restored. You can continue with a follow-up.'; renderSaved();
 }
@@ -118,7 +182,7 @@ $('form').addEventListener('submit',async event=>{
 });
 $('new').addEventListener('click',async()=>{
  busy(true);
- try{await request({new:true});$('conversation').replaceChildren();renderSaved();$('status').textContent='Started a fresh conversation. Earlier conversations are saved.';}
+ try{await request({new:true});$('conversation').replaceChildren();$('chat-scroll').scrollTop=0;renderSaved();$('status').textContent='Started a fresh conversation. Earlier conversations are saved.';}
  catch(error){$('status').textContent=error.message;}finally{busy(false);}
 });
 $('conversation-search').addEventListener('input',renderSaved);
@@ -136,7 +200,7 @@ $('archive-dialog').addEventListener('close',async()=>{
  busy(true);
  try{
   await request({action:'archive',session:id,confirmed:true});
-  if(session===id){session=null;sessionStorage.removeItem('history-conversation');$('conversation').replaceChildren();}
+  if(session===id){session=null;sessionStorage.removeItem('history-conversation');$('conversation').replaceChildren();$('chat-scroll').scrollTop=0;}
   await refreshSaved(); $('status').textContent='Conversation archived.';
  }catch(error){$('status').textContent=error.message;}finally{busy(false);}
 });
@@ -147,6 +211,9 @@ $('question').addEventListener('keydown',event=>{
   const field=event.target; field.setRangeText('\n',field.selectionStart,field.selectionEnd,'end'); field.dispatchEvent(new Event('input',{bubbles:true}));
  }else if(!event.repeat && !$('send').disabled){$('form').requestSubmit();}
 });
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closePreviews();});
+document.addEventListener('click',event=>{if(!event.target.closest('.citation-wrap'))closePreviews();});
+$('chat-scroll').addEventListener('scroll',()=>closePreviews(),{passive:true});
 
 busy(true);
 fetch('/api/bootstrap').then(response=>{if(!response.ok)throw Error('Cannot connect to local server');return response.json();}).then(async data=>{

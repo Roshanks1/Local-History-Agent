@@ -17,16 +17,19 @@
   <p id="no-saved" class="empty-sidebar">No saved conversations yet.</p>
  </aside>
  <main>
-  <header>
-   <span class="eyebrow">YOUR OFFLINE READING ROOM</span>
-   <h1>Local History</h1>
-   <p>Ask a question. Follow the evidence. Keep exploring.</p>
-   <div class="controls">
-    <label>Model <select id="model"><option>qwen3:14b</option><option>qwen3:8b</option></select></label>
-    <label><input id="debug" type="checkbox"> Debug trace</label>
-   </div>
-  </header>
-  <section id="conversation" aria-label="Conversation"><p id="welcome">Explore a historical question, then open a source to read the complete archived article.</p></section>
+  <div id="chat-scroll" class="chat-scroll">
+   <header>
+    <span class="eyebrow">YOUR OFFLINE READING ROOM</span>
+    <h1>Local History</h1>
+    <p>Ask a question. Follow the evidence. Keep exploring.</p>
+    <div class="controls">
+     <label>Model <select id="model"><option>qwen3:14b</option><option>qwen3:8b</option></select></label>
+     <label><input id="debug" type="checkbox"> Debug trace</label>
+    </div>
+   </header>
+   <section id="conversation" aria-label="Conversation"><p id="welcome">Explore a historical question, then open a source to read the complete archived article.</p></section>
+   <footer>Wikipedia archive · Local Ollama · No cloud services<br>Answers may contain errors. Check the cited articles.</footer>
+  </div>
   <form id="form">
    <label for="question">Your history question</label>
    <textarea id="question" rows="3" maxlength="4000" placeholder="What caused the Thirty Years’ War?" required></textarea>
@@ -34,7 +37,6 @@
    <button id="send">Ask question</button>
    <p id="status" role="status" aria-live="polite"></p>
   </form>
-  <footer>Wikipedia archive · Local Ollama · No cloud services<br>Answers may contain errors. Check the cited articles.</footer>
  </main>
 </div>
 <dialog id="archive-dialog">

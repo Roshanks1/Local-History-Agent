@@ -1,13 +1,38 @@
 import json
 import threading
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from unittest.mock import Mock
 from usage import normalize_usage, format_usage
 from offline_reader import OfflineReader, validate_path
-from local_ui import Application, make_server
+from local_ui import Application, make_server, preview_excerpt
+
+
+class UIAssetTests(unittest.TestCase):
+    def test_composer_is_outside_the_single_chat_scroll_region(self):
+        html = Path('ui.html').read_text()
+        css = Path('ui.css').read_text()
+        javascript = Path('ui.js').read_text()
+        self.assertLess(html.index('id="chat-scroll"'), html.index('id="conversation"'))
+        self.assertLess(html.index('</div>\n  <form id="form">'), html.index('id="question"'))
+        self.assertIn('grid-template-rows:minmax(0,1fr) auto', css)
+        self.assertIn('.chat-scroll{min-height:0', css)
+        self.assertIn('overflow-y:auto', css)
+        self.assertIn("$('chat-scroll').addEventListener('scroll'", javascript)
+
+    def test_responsive_composer_and_preview_clearance(self):
+        css = Path('ui.css').read_text()
+        javascript = Path('ui.js').read_text()
+        self.assertIn('height:100dvh', css)
+        self.assertIn('safe-area-inset-bottom', css)
+        self.assertIn('max-height:min(36dvh,240px)', css)
+        self.assertIn('.citation-wrap.preview-below', css)
+        self.assertIn("wrap.classList.toggle('preview-below'", javascript)
+        self.assertIn('wasNearLatest', javascript)
+        self.assertIn("$('chat-scroll').scrollTop=0", javascript)
 
 
 class UsageTests(unittest.TestCase):
@@ -120,7 +145,45 @@ class SessionTests(unittest.TestCase):
         ]})
         self.assertIn('?citation=', result['sources'][0]['article_url'])
         self.assertTrue(result['sources'][0]['article_url'].endswith('#cited-evidence'))
+        self.assertEqual(result['sources'][0]['evidence_status'], 'exact')
+        self.assertEqual(result['sources'][0]['preview_excerpt'], 'Complete archived article evidence appears in this paragraph.')
+        self.assertNotIn('supplied_text', result['sources'][0])
         self.assertEqual(result['sources'][1]['article_url'], '/wiki/Article')
+        self.assertEqual(result['sources'][1]['evidence_status'], 'article')
+
+    def test_preview_excerpt_is_bounded_plain_text_and_old_sources_still_open(self):
+        excerpt = preview_excerpt('  First sentence.\n' + '<img src=x> evidence ' * 30)
+        self.assertLessEqual(len(excerpt), 281)
+        self.assertIn('<img src=x>', excerpt)
+        self.assertNotIn('\n', excerpt)
+        result = self.app.source_links({'answer': 'Old answer', 'sources': [
+            {'label': 'S1', 'article_path': 'Alias', 'section': 'Unknown'}
+        ]})
+        source = result['sources'][0]
+        self.assertIsNone(source['preview_excerpt'])
+        self.assertEqual(source['article_title'], 'Alias')
+        self.assertEqual(source['evidence_status'], 'article')
+        self.assertTrue(source['article_url'].startswith('/wiki/'))
+
+    def test_full_evidence_is_persisted_but_not_returned_to_the_browser(self):
+        evidence = 'Complete archived article evidence appears in this paragraph.'
+        def answer_with_evidence(args):
+            return {'answer': 'Claim [S1]', 'sources': [
+                {'label': 'S1', 'article_path': 'Article', 'section': 'Intro',
+                 'text': evidence, 'supplied_text': evidence}
+            ]}
+        content = f'<html><body><p>{evidence}</p></body></html>'.encode()
+        item = SimpleNamespace(path='Article', mimetype='text/html', content=content)
+        reader = OfflineReader(SimpleNamespace(get_entry_by_path=lambda path: SimpleNamespace(is_redirect=False, get_item=lambda:item)))
+        app = Application(reader, answer_with_evidence)
+        self.addCleanup(app.store.close)
+        response = app.run({'question': 'Question'})
+        returned = response['result']['sources'][0]
+        persisted = app.store.load(response['session'])['turns'][0]['result']['sources'][0]
+        self.assertNotIn('supplied_text', returned)
+        self.assertNotIn('text', returned)
+        self.assertEqual(persisted['supplied_text'], evidence)
+        self.assertEqual(persisted['text'], evidence)
 
 
 class HTTPTests(unittest.TestCase):
