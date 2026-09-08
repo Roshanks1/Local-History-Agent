@@ -1,5 +1,8 @@
 import tempfile
 import unittest
+import json
+import sqlite3
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -15,6 +18,41 @@ def answer(args):
 
 
 class SavedTests(unittest.TestCase):
+    def test_version_one_database_migrates_without_losing_conversation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'history.sqlite3'
+            state = json.dumps(dict(max_turns=4, max_chars=1800, turns=[], focus='', entities=[],
+                                    periods=[], events=[], articles=[], ambiguous_topics=[],
+                                    effective_type='general', clarification_options=[]))
+            db = sqlite3.connect(path)
+            db.execute('CREATE TABLE conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL, updated REAL NOT NULL, state TEXT NOT NULL, turns TEXT NOT NULL)')
+            db.execute('INSERT INTO conversations VALUES (?,?,?,?,?)', ('old', 'Old title', 123.0, state, '[]'))
+            db.commit(); db.close()
+            from conversation_store import ConversationStore, SCHEMA_VERSION
+            store = ConversationStore(path)
+            self.addCleanup(store.close)
+            self.assertEqual(store.load('old')['created'], 123.0)
+            self.assertEqual(store.db.execute('PRAGMA user_version').fetchone()[0], SCHEMA_VERSION)
+
+    def test_rename_search_archive_and_export(self):
+        app = Application(None, answer)
+        self.addCleanup(app.store.close)
+        created = app.run({'question':'Thirty Years War'})
+        sid = created['session']
+        renamed = app.run({'action':'rename','session':sid,'title':' Causes & consequences '})
+        self.assertEqual(renamed['title'], 'Causes & consequences')
+        self.assertEqual(app.run({'action':'list','search':'CONSEQuences'})['conversations'][0]['id'], sid)
+        exported = app.run({'action':'export','session':sid})
+        self.assertEqual(exported['filename'], 'Causes - consequences.md')
+        self.assertIn('# Causes & consequences', exported['markdown'])
+        self.assertIn('## Question', exported['markdown'])
+        with self.assertRaisesRegex(ValueError, 'confirmation'):
+            app.run({'action':'archive','session':sid})
+        app.run({'action':'archive','session':sid,'confirmed':True})
+        self.assertEqual(app.run({'action':'list'})['conversations'], [])
+        with self.assertRaises(ValueError):
+            app.run({'action':'open','session':sid})
+
     def test_restart_restore_continue_and_new_preserves(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'history.sqlite3'

@@ -1,1 +1,48 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local History</title><link rel="stylesheet" href="/ui.css"><script src="/ui.js" defer></script><body><main><header><span class="eyebrow">YOUR OFFLINE READING ROOM</span><h1>Local History</h1><p>Ask a question. Follow the evidence. Keep exploring.</p><div class="controls"><button id="new">New conversation</button><label>Model <select id="model"><option>qwen3:14b</option><option>qwen3:8b</option></select></label><label><input id="debug" type="checkbox"> Debug trace</label></div><div class="history-picker"><label for="saved">Saved conversations</label><select id="saved"><option value="">Choose a saved conversation…</option></select></div></header><section id="conversation" aria-label="Conversation"><p id="welcome">Explore a historical question, then open a source to read the complete archived article.</p></section><form id="form"><label for="question">Your history question</label><textarea id="question" rows="3" maxlength="4000" placeholder="What caused the Thirty Years’ War?" required></textarea><small class="keyboard-hint">Enter to send · Command/Ctrl + Enter for a new line</small><button id="send">Ask question</button><p id="status" role="status" aria-live="polite"></p></form><footer>Wikipedia archive · Local Ollama · No cloud services<br>Answers may contain errors. Check the cited articles.</footer></main></body></html>
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Local History</title>
+<link rel="stylesheet" href="/ui.css">
+<script src="/ui.js" defer></script>
+<body>
+<div class="app-shell">
+ <aside class="sidebar" aria-label="Saved conversations">
+  <div class="brand">HISTORY AI</div>
+  <button id="new" class="new-conversation">+ New conversation</button>
+  <label class="search-label" for="conversation-search">Search conversations</label>
+  <input id="conversation-search" type="search" maxlength="200" placeholder="Search conversations…" autocomplete="off">
+  <p class="sidebar-heading">RECENT</p>
+  <nav id="saved" aria-label="Conversation list"></nav>
+  <p id="no-saved" class="empty-sidebar">No saved conversations yet.</p>
+ </aside>
+ <main>
+  <header>
+   <span class="eyebrow">YOUR OFFLINE READING ROOM</span>
+   <h1>Local History</h1>
+   <p>Ask a question. Follow the evidence. Keep exploring.</p>
+   <div class="controls">
+    <label>Model <select id="model"><option>qwen3:14b</option><option>qwen3:8b</option></select></label>
+    <label><input id="debug" type="checkbox"> Debug trace</label>
+   </div>
+  </header>
+  <section id="conversation" aria-label="Conversation"><p id="welcome">Explore a historical question, then open a source to read the complete archived article.</p></section>
+  <form id="form">
+   <label for="question">Your history question</label>
+   <textarea id="question" rows="3" maxlength="4000" placeholder="What caused the Thirty Years’ War?" required></textarea>
+   <small class="keyboard-hint">Enter to send · Command/Ctrl + Enter for a new line</small>
+   <button id="send">Ask question</button>
+   <p id="status" role="status" aria-live="polite"></p>
+  </form>
+  <footer>Wikipedia archive · Local Ollama · No cloud services<br>Answers may contain errors. Check the cited articles.</footer>
+ </main>
+</div>
+<dialog id="archive-dialog">
+ <form method="dialog">
+  <h2>Archive conversation?</h2>
+  <p>This removes it from the sidebar without erasing the database record.</p>
+  <div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="confirm-archive" value="confirm">Archive</button></div>
+ </form>
+</dialog>
+</body>
+</html>

@@ -61,6 +61,20 @@ class ReaderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             reader_fixture().link('Loop')
 
+    def test_evidence_matching_normalizes_unicode_punctuation_and_whitespace(self):
+        content = '''<html><head></head><body><p>Other text.</p><p>The people’s demands — including “liberty” — spread\nwidely across Europe.</p></body></html>'''.encode()
+        item = SimpleNamespace(path='Revolutions', mimetype='text/html', content=content)
+        reader = OfflineReader(SimpleNamespace(get_entry_by_path=lambda path: SimpleNamespace(is_redirect=False, get_item=lambda:item)))
+        evidence = 'The people\'s demands - including "liberty" - spread widely across Europe.'
+        self.assertTrue(reader.has_evidence('Revolutions', evidence))
+        _, _, body = reader.read('Revolutions', evidence)
+        self.assertIn(b'id="cited-evidence"', body)
+        self.assertIn(b'Cited evidence', body)
+        self.assertIn(b'prefers-color-scheme:dark', body)
+        self.assertIn(b'color:#fff8df!important', body)
+        self.assertNotIn(b'<script', body)
+        self.assertFalse(reader.has_evidence('Revolutions', 'A passage that does not occur anywhere in this article.'))
+
 
 class SessionTests(unittest.TestCase):
     def setUp(self):
@@ -93,6 +107,20 @@ class SessionTests(unittest.TestCase):
             self.app.run({'session': sid, 'question': 'x'})
         self.app.answer = original
         self.assertIn('result', self.app.run({'session': sid, 'question': 'retry'}))
+
+    def test_sources_get_independent_exact_citation_links(self):
+        content = b'<html><body><p>Complete archived article evidence appears in this paragraph.</p></body></html>'
+        item = SimpleNamespace(path='Article', mimetype='text/html', content=content)
+        reader = OfflineReader(SimpleNamespace(get_entry_by_path=lambda path: SimpleNamespace(is_redirect=False, get_item=lambda:item)))
+        app = Application(reader, self.app.answer)
+        self.addCleanup(app.store.close)
+        result = app.source_links({'sources': [
+            {'label':'S1','article_path':'Article','supplied_text':'Complete archived article evidence appears in this paragraph.'},
+            {'label':'S2','article_path':'Article','supplied_text':'Missing evidence','section':'Missing'},
+        ]})
+        self.assertIn('?citation=', result['sources'][0]['article_url'])
+        self.assertTrue(result['sources'][0]['article_url'].endswith('#cited-evidence'))
+        self.assertEqual(result['sources'][1]['article_url'], '/wiki/Article')
 
 
 class HTTPTests(unittest.TestCase):

@@ -1,12 +1,13 @@
 """Loopback-only conversation UI and read-only offline Wikipedia viewer."""
 import argparse
+from collections import OrderedDict
 import json
 import secrets
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 from conversation_state import ConversationState
 from history_ai import ROOT, ZIM_PATH, ask
 from offline_reader import OfflineReader
@@ -21,14 +22,24 @@ class Application:
         # Keep each read/modify/write and shared embedding-cache operation serialized.
         self.generation_lock = threading.Lock()
         self.token = secrets.token_urlsafe(32)
+        self.citations = OrderedDict()
 
     def source_links(self, result):
         result = dict(result)
         result['sources'] = [dict(source) for source in result['sources']]
         for source in result['sources']:
             try:
-                source['article_url'] = self.reader.link(source['article_path'],
-                    source.get('section'), source.get('subsection'))
+                fallback = self.reader.link(source['article_path'], source.get('section'), source.get('subsection'))
+                evidence = source.get('supplied_text')
+                if evidence and self.reader.has_evidence(source['article_path'], evidence):
+                    citation = secrets.token_urlsafe(18)
+                    article_path = urlsplit(fallback).path
+                    self.citations[citation] = (article_path, evidence)
+                    if len(self.citations) > 512:
+                        self.citations.popitem(last=False)
+                    source['article_url'] = article_path + '?citation=' + citation + '#cited-evidence'
+                else:
+                    source['article_url'] = fallback
             except (KeyError, ValueError, RuntimeError):
                 source['article_url'] = None
         return result
@@ -39,8 +50,20 @@ class Application:
         with self.generation_lock:
             action = data.get('action')
             if action == 'list':
-                return dict(conversations=self.store.list())
+                return dict(conversations=self.store.list(data.get('search', '')))
             sid = data.get('session')
+            if action == 'rename':
+                saved = self.store.rename(sid, data.get('title'))
+                return dict(id=sid, title=saved['title'])
+            if action == 'archive':
+                if data.get('confirmed') is not True:
+                    raise ValueError('Archive confirmation is required')
+                self.store.archive(sid)
+                return dict(archived=sid)
+            if action == 'export':
+                saved = self.store.load(sid)
+                return dict(filename=self._export_filename(saved['title']),
+                            markdown=self.store.export_markdown(sid))
             question = data.get('question', '')
             if not isinstance(question, str) or len(question) > 4000:
                 raise ValueError('Question must be at most 4000 characters')
@@ -70,6 +93,12 @@ class Application:
             saved['turns'].append(dict(question=question.strip(), result=result))
             self.store.save(saved)
             return dict(session=sid, result=self.source_links(result))
+
+    @staticmethod
+    def _export_filename(title):
+        safe = ''.join(character if character.isalnum() or character in ' -_' else '-'
+                       for character in title).strip(' .-_')[:80]
+        return (safe or 'conversation') + '.md'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -108,7 +137,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, (Path(__file__).parent/filename).read_bytes(), mime)
         if path.startswith('/wiki/'):
             try:
-                canonical, mime, content = self.server.app.reader.read(unquote(path[6:], errors='strict'))
+                citation = parse_qs(urlsplit(self.path).query).get('citation', [None])[0]
+                saved = self.server.app.citations.get(citation)
+                evidence = saved[1] if saved and saved[0] == path else None
+                canonical, mime, content = self.server.app.reader.read(unquote(path[6:], errors='strict'), evidence)
                 if canonical != path:
                     return self.reply(302, b'', headers={'Location': canonical}, archive=True)
                 return self.reply(200, content, mime, archive=True)
