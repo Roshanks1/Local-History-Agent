@@ -1,0 +1,67 @@
+{
+  "name": "Existing five-question development benchmark",
+  "label_status": "Provisional assistant-authored relevance judgments from local chunk text; not independently reviewed or guaranteed exhaustive. Recall measures coverage of these labels.",
+  "corpus_sha256": "68292148773345416d96ed9e3f228027b0d298096213c5c4cb6dbb7a0045180d",
+  "questions": [
+    {
+      "id": "tyw-01",
+      "question": "What caused the Thirty Years' War?",
+      "relevant_chunk_ids": [
+        "Thirty_Years_War_000",
+        "Thirty_Years_War_001",
+        "Thirty_Years_War_002",
+        "Thirty_Years_War_004",
+        "Thirty_Years_War_007",
+        "Thirty_Years_War_008"
+      ],
+      "rationale": "Religious/imperial tensions and immediate Bohemian triggers."
+    },
+    {
+      "id": "tyw-02",
+      "question": "How did the Thirty Years' War begin?",
+      "relevant_chunk_ids": [
+        "Thirty_Years_War_000",
+        "Thirty_Years_War_001",
+        "Thirty_Years_War_007",
+        "Thirty_Years_War_008"
+      ],
+      "rationale": "Bohemian revolt, religious rights and Defenestration."
+    },
+    {
+      "id": "tyw-03",
+      "question": "Why did France enter the Thirty Years' War?",
+      "relevant_chunk_ids": [
+        "Thirty_Years_War_000",
+        "Thirty_Years_War_001",
+        "Thirty_Years_War_004",
+        "Thirty_Years_War_024"
+      ],
+      "rationale": "Habsburg rivalry and intervention following N\u00f6rdlingen."
+    },
+    {
+      "id": "tyw-04",
+      "question": "How did the Thirty Years' War end?",
+      "relevant_chunk_ids": [
+        "Thirty_Years_War_001",
+        "Thirty_Years_War_031",
+        "Thirty_Years_War_038",
+        "Thirty_Years_War_039",
+        "Thirty_Years_War_040"
+      ],
+      "rationale": "Military pressure, Westphalian treaties and settlement terms."
+    },
+    {
+      "id": "tyw-05",
+      "question": "What were the human costs of the Thirty Years' War?",
+      "relevant_chunk_ids": [
+        "Thirty_Years_War_000",
+        "Thirty_Years_War_043",
+        "Thirty_Years_War_044",
+        "Thirty_Years_War_045",
+        "Thirty_Years_War_046",
+        "Thirty_Years_War_047"
+      ],
+      "rationale": "Deaths, disease, famine and population losses."
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "source": "artifacts/qwen-comparison.json",
+  "reviewer": "assistant; qualitative evidence comparison, not independent historical fact checking",
+  "summary": {
+    "qwen3:8b": {
+      "answers": 5,
+      "mean_tokens_per_second": 37.71809728858565,
+      "mean_wall_seconds": 8.2188252664,
+      "length_truncated": 0,
+      "unknown_citation_labels": 0
+    },
+    "qwen3:14b": {
+      "answers": 5,
+      "mean_tokens_per_second": 22.14273793336437,
+      "mean_wall_seconds": 11.5708141914,
+      "length_truncated": 0,
+      "unknown_citation_labels": 0
+    }
+  },
+  "observations": [
+    {
+      "model": "qwen3:8b",
+      "question_id": "tyw-02",
+      "issue": "Calls replacement of Ferdinand by Frederick the Defenestration of Prague; supplied S1 does not say this. Unsupported conflation."
+    },
+    {
+      "model": "qwen3:8b",
+      "question_id": "tyw-03",
+      "issue": "States alliance entry in 1635 but supplied S2 says France joined as a Swedish ally in March 1636. Also attributes Habsburg-rival rationale to S2 although it appears in S1."
+    },
+    {
+      "model": "qwen3:8b",
+      "question_id": "tyw-04",
+      "issue": "Calls 1654 garrison withdrawal the formal end of the war; supplied S5 only discusses delayed demobilization."
+    },
+    {
+      "model": "qwen3:8b",
+      "question_id": "tyw-05",
+      "issue": "Converts 1.3–1.8 million military casualties into military deaths. Supplied source distinguishes killed/wounded and casualties."
+    },
+    {
+      "model": "qwen3:14b",
+      "question_id": "tyw-03",
+      "issue": "Infers motives from later outcomes in S5; supporting evidence for causal intent should be reviewed."
+    },
+    {
+      "model": "both",
+      "question_id": "tyw-02",
+      "issue": "Both follow the retrieved introduction, whose compressed chronology should be checked against detailed article passages. Source-grounded answers can preserve source errors."
+    }
+  ]
+}

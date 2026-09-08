@@ -1,0 +1,166 @@
+"""Loopback-only conversation UI and read-only offline Wikipedia viewer."""
+import argparse
+import json
+import secrets
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+from conversation_state import ConversationState
+from history_ai import ROOT, ZIM_PATH, ask
+from offline_reader import OfflineReader
+from retrieval_config import load_config
+
+
+class Application:
+    def __init__(self, reader, answer=ask, store_path=None):
+        from conversation_store import ConversationStore
+        self.reader, self.answer = reader, answer
+        self.store = ConversationStore(store_path)
+        # Keep each read/modify/write and shared embedding-cache operation serialized.
+        self.generation_lock = threading.Lock()
+        self.token = secrets.token_urlsafe(32)
+
+    def source_links(self, result):
+        result = dict(result)
+        result['sources'] = [dict(source) for source in result['sources']]
+        for source in result['sources']:
+            try:
+                source['article_url'] = self.reader.link(source['article_path'],
+                    source.get('section'), source.get('subsection'))
+            except (KeyError, ValueError, RuntimeError):
+                source['article_url'] = None
+        return result
+
+    def run(self, data):
+        if not isinstance(data, dict):
+            raise ValueError('Expected a JSON object')
+        with self.generation_lock:
+            action = data.get('action')
+            if action == 'list':
+                return dict(conversations=self.store.list())
+            sid = data.get('session')
+            question = data.get('question', '')
+            if not isinstance(question, str) or len(question) > 4000:
+                raise ValueError('Question must be at most 4000 characters')
+            if action == 'open':
+                saved = self.store.load(sid)
+                return dict(session=sid, title=saved['title'],
+                    turns=[dict(question=t['question'], result=self.source_links(t['result'])) for t in saved['turns']])
+            if data.get('new') or question.strip() == '/new':
+                # A new conversation never erases a saved one.
+                return dict(session=None, reset=True)
+            if not question.strip():
+                raise ValueError('Enter a question')
+            model = data.get('model', 'qwen3:14b')
+            if model not in ('qwen3:14b', 'qwen3:8b'):
+                raise ValueError('Unsupported local model')
+            if sid is None:
+                sid = secrets.token_urlsafe(24)
+                config = load_config()
+                saved = dict(id=sid, title=question.strip()[:80], turns=[],
+                    state=ConversationState(max_turns=config.history_turns, max_chars=config.history_chars))
+            else:
+                saved = self.store.load(sid)
+            result = self.answer(argparse.Namespace(question=question.strip(), model=model,
+                conversation=saved['state'], config=None, index=None, top_k=None, context_chars=None,
+                num_predict=600, debug=data.get('debug') is True, quiet=True,
+                output=ROOT/'artifacts'/'ui'/f'{time.time_ns()}-{secrets.token_hex(4)}.json'))
+            saved['turns'].append(dict(question=question.strip(), result=result))
+            self.store.save(saved)
+            return dict(session=sid, result=self.source_links(result))
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def reply(self, code, content, mime='application/json', headers=None, archive=False):
+        if not isinstance(content, bytes):
+            content = json.dumps(content).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', mime)
+        self.send_header('Content-Length', str(len(content)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        csp = ("default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; sandbox allow-same-origin" if archive else
+               "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header('Content-Security-Policy', csp)
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(content)
+
+    def valid_host(self):
+        return self.headers.get('Host') == f'127.0.0.1:{self.server.server_port}'
+
+    def do_GET(self):
+        if not self.valid_host():
+            return self.reply(403, {'error': 'Loopback host required'})
+        path = urlsplit(self.path).path
+        if path == '/api/bootstrap':
+            return self.reply(200, {'token': self.server.app.token})
+        assets = {'/': ('ui.html', 'text/html; charset=utf-8'), '/ui.js': ('ui.js', 'text/javascript'), '/ui.css': ('ui.css', 'text/css')}
+        if path in assets:
+            filename, mime = assets[path]
+            return self.reply(200, (Path(__file__).parent/filename).read_bytes(), mime)
+        if path.startswith('/wiki/'):
+            try:
+                canonical, mime, content = self.server.app.reader.read(unquote(path[6:], errors='strict'))
+                if canonical != path:
+                    return self.reply(302, b'', headers={'Location': canonical}, archive=True)
+                return self.reply(200, content, mime, archive=True)
+            except (KeyError, ValueError, RuntimeError, UnicodeError):
+                return self.reply(404, {'error': 'Article or resource unavailable in this archive'}, archive=True)
+        return self.reply(404, {'error': 'Not found'})
+
+    def do_POST(self):
+        origin = f'http://127.0.0.1:{self.server.server_port}'
+        if not self.valid_host() or self.headers.get('Origin') not in (None, origin) or self.headers.get('X-Local-Token') != self.server.app.token:
+            return self.reply(403, {'error': 'Local session authorization required'})
+        if self.path != '/api/chat':
+            return self.reply(404, {'error': 'Not found'})
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+            if not 0 < length <= 20000:
+                raise ValueError('Invalid request size')
+            data = json.loads(self.rfile.read(length))
+            result = self.server.app.run(data)
+            self.reply(200, result)
+        except (ValueError, UnicodeError) as error:
+            self.reply(400, {'error': str(error)})
+        except Exception:
+            self.reply(503, {'error': 'Answer failed. Check local Ollama at 127.0.0.1:11434, installed models, archive, and available disk space. You can retry.'})
+
+
+def make_server(port, app):
+    server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
+    server.app = app
+    return server
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--port', type=int, default=8765)
+    args = parser.parse_args()
+    if not 0 <= args.port <= 65535:
+        parser.error('Port must be 0–65535')
+    from libzim.reader import Archive
+    try:
+        server = make_server(args.port, Application(OfflineReader(Archive(str(ZIM_PATH))), store_path=ROOT/'data'/'conversations.sqlite3'))
+    except (OSError, RuntimeError) as error:
+        parser.exit(1, f'Cannot start local UI: {error}. Check the archive or choose another --port.\n')
+    print(f'Open http://127.0.0.1:{server.server_port} — Ctrl+C stops the server.', flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        server.app.store.close()
+
+
+if __name__ == '__main__':
+    main()

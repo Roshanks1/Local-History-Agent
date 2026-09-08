@@ -1,0 +1,22 @@
+# Python Env
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local caches
+.cache/
+
+# Local App data
+data/
+artifacts/
+
+# OS files
+.DS_Store
+
+# Logs / Temp
+*.log
+*.tmp
+
+# Env / Secrets
+.env
+.env.*

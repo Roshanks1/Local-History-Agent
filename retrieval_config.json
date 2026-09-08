@@ -1,0 +1,20 @@
+{
+  "candidate_articles": 4,
+  "initial_top_k": 12,
+  "article_top_k": 3,
+  "chunks_per_article": 6,
+  "chunks_per_section": 3,
+  "expanded_context_k": 10,
+  "similarity_threshold": 0.15,
+  "context_token_budget": 4800,
+  "context_chars": 15000,
+  "section_boost": 0.18,
+  "article_boost": 0.08,
+  "history_turns": 4,
+  "history_chars": 1800,
+  "timeline_events": 24,
+  "timeline_candidates": 32,
+  "continuation_year_window": 30,
+  "max_chars": 2000,
+  "overlap_chars": 300
+}
