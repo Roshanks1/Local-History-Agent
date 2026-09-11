@@ -1,0 +1,62 @@
+{
+  "name": "Version 1.2 deterministic retrieval acceptance properties",
+  "schema_version": 1,
+  "questions": [
+    {
+      "id": "roman-republic-collapse",
+      "question": "Why did the Roman Republic collapse?",
+      "breadth": "broad",
+      "minimum_distinct_articles": 3,
+      "acceptable_titles": ["Roman_Republic", "Social_War_(91–87_BC)", "Sulla", "Julius_Caesar", "First_Triumvirate"],
+      "required_dimensions": ["political institutions", "social conflict", "military change", "civil war"]
+    },
+    {
+      "id": "thirty-years-war",
+      "question": "What caused the Thirty Years' War, and why did it spread beyond Bohemia?",
+      "breadth": "broad",
+      "minimum_distinct_articles": 3,
+      "acceptable_titles": ["Thirty_Years'_War", "Bohemian_Revolt", "Defenestrations_of_Prague", "Peace_of_Westphalia"]
+    },
+    {
+      "id": "haitian-revolution",
+      "question": "How did the Haitian Revolution reshape slavery and Atlantic politics?",
+      "breadth": "broad",
+      "minimum_distinct_articles": 3,
+      "acceptable_titles": ["Haitian_Revolution", "Saint-Domingue", "Haiti", "Toussaint_Louverture"]
+    },
+    {
+      "id": "july-crisis",
+      "question": "How did the assassination of Archduke Franz Ferdinand lead to a general European war?",
+      "breadth": "broad",
+      "minimum_distinct_articles": 3,
+      "acceptable_titles": ["Assassination_of_Archduke_Franz_Ferdinand", "July_Crisis", "Serbia", "Austria-Hungary"]
+    },
+    {
+      "id": "revolutions-comparison",
+      "question": "Compare the causes of the French and Russian Revolutions.",
+      "breadth": "broad",
+      "minimum_distinct_articles": 2,
+      "acceptable_titles": ["French_Revolution", "Russian_Revolution"]
+    },
+    {
+      "id": "versailles-weimar",
+      "question": "How did the Treaty of Versailles contribute to instability in the Weimar Republic?",
+      "breadth": "broad",
+      "minimum_distinct_articles": 2,
+      "acceptable_titles": ["Treaty_of_Versailles", "Weimar_Republic", "World_War_I_reparations"]
+    },
+    {
+      "id": "magna-carta-control",
+      "question": "In what year was Magna Carta sealed?",
+      "breadth": "narrow",
+      "maximum_distinct_articles": 2,
+      "acceptable_titles": ["Magna_Carta"]
+    }
+  ],
+  "global_properties": {
+    "maximum_context_tokens": 4800,
+    "maximum_duplicate_overlap": 0.72,
+    "deterministic_ordering": true,
+    "selected_sources_must_be_locally_resolvable": true
+  }
+}

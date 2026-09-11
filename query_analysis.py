@@ -24,7 +24,7 @@ def detect_type(question):
         return 'timeline'
     if re.search(r'\b(compar\w*|versus|vs\.?|differences?|similarities?|differ)\b', q):
         return 'comparison'
-    if re.search(r'\b(why|caus\w*|explain|explanation|reason\w*|led to|immediate|mattered)\b', q):
+    if re.search(r'\b(why|caus\w*|explain|explanation|reason\w*|lead to|led to|contribut\w*|collapse\w*|immediate|mattered)\b', q):
         return 'cause'
     if re.search(r'^(who|where|what) (?:was|were|is|are)\b|^tell me about\b', q):
         return 'lookup'

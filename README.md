@@ -18,7 +18,7 @@ Which cause was the most immediate?
 Why?
 ```
 
-The assistant automatically searches Wikipedia, expands relevant article sections, and keeps recent conversational context. It can ask for clarification when a reference is unclear.
+The assistant automatically plans bounded local research, searches several relevant archive articles for broad questions, reranks nonredundant evidence, and keeps recent conversational context. Narrow questions stay focused, and unclear references can trigger clarification.
 
 - `/new` — start a fresh conversation.
 - `/debug` — toggle detailed retrieval traces saved with each answer.
@@ -37,7 +37,7 @@ The existing archive path remains **`data/wikipedia/wikipedia_en_all_nopic_2026-
 
 Each one-shot command starts without dialogue memory. Use the interactive program for follow-ups.
 
-`retrieval_config.json` controls retrieval sizes, section/article weights, deduplication limits, estimated context-token and character budgets, history bounds, and timeline settings. `--config PATH` selects another configuration for a one-shot question. `--top-k` caps supplied passages and `--context-chars` tightens the character limit. See `ARCHITECTURE.md` for details and limitations.
+`retrieval_config.json` controls query/entity/article/chunk bounds, ranking weights, diversity and deduplication limits, estimated context-token and character budgets, history bounds, and timeline settings. `--config PATH` selects another configuration for a one-shot question. `--top-k` caps supplied passages and `--context-chars` tightens the character limit. See `ARCHITECTURE.md` for details and limitations.
 
 Answers and source passages are saved under `artifacts/`. Debug mode additionally saves the interpreted query, initial/expanded retrieval, article ranking, dated records, and exact model context. Normal terminal output keeps these details hidden. Memory itself is session-local; `/new` and program restart clear it.
 
@@ -53,7 +53,7 @@ Timeline questions collect dated evidence across relevant sections, preserve dat
 .venv/bin/python evaluate_assistant.py --live --output artifacts/my-assistant-evaluation
 ```
 
-The live evaluation uses your local models and saves per-turn JSON traces and readable transcripts. It checks causal/background retrieval, three-turn cause continuity, Defenestration follow-up context, and dated chronology. Unit tests additionally cover ambiguity/clarification, reset, bounds, duplicate evidence, redirects, dates/ranges/BCE, and source-bound timeline formatting. Use `tests/` discovery: old exploratory `*_test.py` scripts at the project root perform live work on import.
+The live evaluation uses your local models and saves per-turn JSON traces and readable transcripts. Unit tests cover retrieval planning, historical entities, one-hop local expansion, candidate provenance and bounds, deterministic reranking, diversity/redundancy selection, exact generation-source mapping, conversations, redirects, dates, and the source reader. The seven-question v1.2 acceptance properties are in `benchmarks/multi_source_retrieval.json`. Use `tests/` discovery: old exploratory `*_test.py` scripts at the project root perform live work on import.
 
 Inspection found **five benchmark questions and 59 chunks**, not a 59-question dataset. Labels in `benchmarks/thirty_years_war.json` are provisional assistant-authored judgments, not independent ground truth. `BASELINE.md` preserves the earlier measured baseline. The new evaluation reports both raw and expanded results; gains in early relevance may trade off against labeled chunk recall.
 

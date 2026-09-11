@@ -49,7 +49,7 @@ def deduplicate(hits, limit):
     return selected
 
 
-def expand_ranked(ranked, analysis, config):
+def expand_ranked(ranked, analysis, config, plan=None, discovery=None):
     """Rank articles from initial scores/frequency, then revisit all their sections."""
     initial = [h for h in ranked[:config.initial_top_k] if h['score'] >= config.similarity_threshold]
     grouped = defaultdict(list)
@@ -138,12 +138,19 @@ def expand_ranked(ranked, analysis, config):
                 section_openings[key] = h
         leaders = sorted(section_openings.values(), key=lambda h: -h['expansion_score'])
         timeline_pool = deduplicate(leaders + pool, config.timeline_candidates)
-    return final, {'initial_chunks': initial, 'candidate_articles': articles,
-                   'expanded_chunks': expanded, 'final_chunks': final,
-                   'timeline_candidates': timeline_pool}
+    trace = {'initial_chunks': initial, 'candidate_articles': articles,
+             'expanded_chunks': expanded, 'final_chunks': final,
+             'timeline_candidates': timeline_pool}
+    if plan is not None:
+        from retrieval_ranking import rerank, select_evidence
+        reranked = rerank(expanded, plan, discovery)
+        final, selection = select_evidence(reranked, config)
+        trace.update(reranked_chunks=reranked, final_chunks=final,
+                     evidence_selection=selection)
+    return final, trace
 
 
-def expand(index, analysis, config, api):
+def expand(index, analysis, config, api, plan=None, discovery=None):
     from history_ai import retrieve
     ranked = retrieve(index, analysis.retrieval_query, len(index['chunks']), api)
     initial_ranked = ranked
@@ -153,7 +160,7 @@ def expand(index, analysis, config, api):
         intent_scores = {h['chunk']['chunk_id']: h['score'] for h in intent}
         ranked = [dict(h, original_score=h['score'],
                        score=.6*h['score']+.4*intent_scores[h['chunk']['chunk_id']]) for h in ranked]
-        ranked.sort(key=lambda h: -h['score'])
-    final, trace = expand_ranked(ranked, analysis, config)
+        ranked.sort(key=lambda h: (-h['score'], h['chunk']['chunk_id']))
+    final, trace = expand_ranked(ranked, analysis, config, plan, discovery)
     trace['raw_initial_chunks'] = initial_ranked[:config.initial_top_k]
     return final, trace

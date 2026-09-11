@@ -76,25 +76,50 @@ def build(args):
     wiki = LocalWikipedia(str(args.zim))
     chunks = []
     structured = getattr(args, 'structured', False)
+    indexed_articles, skipped_articles = [], []
+    per_article_limit = getattr(args, 'candidate_chunks_per_article', None)
+    total_limit = getattr(args, 'candidate_chunks_total', None)
     for article in args.articles:
-        if structured:
-            from structured_wikipedia import get_article
-            blocks = get_article(wiki, article)
-        else:
-            blocks = wiki.get_article(article)
-        chunks.extend(chunk_article(blocks, article,
-                                    max_chars=args.max_chars, overlap_chars=args.overlap_chars))
+        try:
+            if structured:
+                from structured_wikipedia import get_article
+                blocks = get_article(wiki, article)
+            else:
+                blocks = wiki.get_article(article)
+            article_chunks = chunk_article(blocks, article,
+                                           max_chars=args.max_chars, overlap_chars=args.overlap_chars)
+        except (KeyError, RuntimeError, ValueError, UnicodeError) as error:
+            if not getattr(args, 'skip_bad_articles', False):
+                raise
+            skipped_articles.append({'article_path': article, 'reason': type(error).__name__})
+            continue
+        if per_article_limit and len(article_chunks) > per_article_limit:
+            # Even sampling retains lead, middle and later sections without loading
+            # an unbounded long article into the per-question embedding pass.
+            indices = [round(n*(len(article_chunks)-1)/(per_article_limit-1))
+                       for n in range(per_article_limit)] if per_article_limit > 1 else [0]
+            article_chunks = [article_chunks[n] for n in dict.fromkeys(indices)]
+        if total_limit:
+            article_chunks = article_chunks[:max(0, total_limit-len(chunks))]
+        if article_chunks:
+            indexed_articles.append(article)
+            chunks.extend(article_chunks)
+        if total_limit and len(chunks) >= total_limit:
+            break
     if not chunks:
         raise ValueError('No chunks extracted')
     api = client()
     metadata = dict(schema_version=1, embedding_model=args.embed_model,
                     model_digest=model_digest(api, args.embed_model), variant=args.variant,
                     max_chars=args.max_chars, overlap_chars=args.overlap_chars,
-                    articles=args.articles, zim_path=str(args.zim),
+                    articles=indexed_articles, zim_path=str(args.zim),
                     zim_size=args.zim.stat().st_size, zim_mtime_ns=args.zim.stat().st_mtime_ns,
                     chunker_sha256=hashlib.sha256((ROOT/'chunking.py').read_bytes()).hexdigest(),
                     extractor_sha256=hashlib.sha256((ROOT/'wikipedia_local.py').read_bytes()).hexdigest(),
                     corpus_sha256=fingerprint(chunks))
+    if per_article_limit or total_limit:
+        metadata['candidate_chunk_limits'] = {
+            'per_article': per_article_limit, 'total': total_limit}
     if structured:
         metadata['structured_extractor_sha256'] = hashlib.sha256((ROOT/'structured_wikipedia.py').read_bytes()).hexdigest()
     cache = ROOT / '.cache/embeddings'
@@ -114,6 +139,8 @@ def build(args):
             print(f'Embedded/cached {n}/{len(chunks)}', flush=True)
     index = dict(metadata=metadata, chunks=chunks, vectors=vectors)
     index['index_id'] = fingerprint(index)
+    if skipped_articles:
+        index['skipped_articles'] = skipped_articles
     load_index_value(index)
     save(args.index, index)
     if not getattr(args, 'quiet', False):
@@ -359,6 +386,7 @@ def ask(args):
     from query_analysis import analyze
     from retrieval_config import load_config
     from retrieval_expansion import expand
+    from retrieval_planning import build_plan
     from timeline_utils import extract_events, event_hits, infer_period
     config = load_config(getattr(args, 'config', None))
     state = getattr(args, 'conversation', None)
@@ -371,22 +399,40 @@ def ask(args):
         emit('\n' + format_answer(result))
         return result
     emit('\nSearching local Wikipedia and preparing answer...', flush=True)
+    retrieval_started = time.perf_counter()
+    stage_started = retrieval_started
+    plan = build_plan(analysis, config, state)
+    retrieval_timings = {'planning_seconds': time.perf_counter()-stage_started}
     discovery = None
     if args.index is None:
         from wikipedia_local import LocalWikipedia
-        from article_discovery import discover
+        from article_discovery import discover, discover_plan
         # Discovery uses the resolved topic, not an entire generated answer.
         discovery_query = analysis.retrieval_query
         if analysis.is_followup:
             discovery_query = state.focus + ' ' + args.question
-        discovery = discover(LocalWikipedia(str(ZIM_PATH)), discovery_query, limit=config.candidate_articles)
+        wiki = LocalWikipedia(str(ZIM_PATH))
+        stage_started = time.perf_counter()
+        try:
+            discovery = discover_plan(wiki, plan, config)
+            discovery['fallback'] = None
+        except (KeyError, RuntimeError, ValueError) as error:
+            discovery = discover(wiki, discovery_query, limit=plan.article_limit)
+            discovery['fallback'] = type(error).__name__
+            discovery['article_reasons'] = {article: ['fallback question search']
+                                            for article in discovery['articles']}
+        retrieval_timings['discovery_seconds'] = time.perf_counter()-stage_started
         if discovery['articles']:
+            stage_started = time.perf_counter()
             path = ROOT / '.cache/article-indexes' / (fingerprint(discovery['articles']) + '.json')
             build(argparse.Namespace(zim=ZIM_PATH, articles=discovery['articles'],
                   max_chars=config.max_chars, overlap_chars=config.overlap_chars,
                   embed_model='nomic-embed-text', variant='title', index=path,
-                  quiet=True, structured=True))
+                  quiet=True, structured=True, skip_bad_articles=True,
+                  candidate_chunks_per_article=config.candidate_chunks_per_article,
+                  candidate_chunks_total=config.candidate_chunks_total))
             index = load_index_value(read(path))
+            retrieval_timings['indexing_seconds'] = time.perf_counter()-stage_started
         else:
             index = None
     else:
@@ -394,7 +440,9 @@ def ask(args):
     api = client()
     hits, trace, events = [], {}, []
     if index:
-        hits, trace = expand(index, analysis, config, api)
+        stage_started = time.perf_counter()
+        hits, trace = expand(index, analysis, config, api, plan, discovery)
+        retrieval_timings['ranking_seconds'] = time.perf_counter()-stage_started
         if analysis.effective_type == 'timeline':
             bounds = infer_period(index, analysis, config)
             trace['timeline_date_bounds'] = bounds
@@ -409,12 +457,20 @@ def ask(args):
     max_chars = args.context_chars if args.context_chars is not None else config.context_chars
     if args.top_k is not None:
         hits = hits[:args.top_k]
+    retrieval_timings['total_seconds'] = time.perf_counter()-retrieval_started
     result = generate(args.question, hits, args.model, api, max_chars, args.num_predict,
                       analysis=analysis, config=config, debug=args.debug)
     result.update(question=args.question, index_id=index['index_id'] if index else None,
                   discovery=discovery, analysis=analysis.to_dict(), timeline_events=events,
-                  retrieval_config=config.to_dict())
+                  retrieval_config=config.to_dict(),
+                  retrieval_summary={'breadth': plan.breadth,
+                     'candidate_articles': len((discovery or {}).get('articles', [])),
+                     'selected_articles': len({s['article_path'] for s in result.get('sources', [])}),
+                     'wall_seconds': retrieval_timings['total_seconds']})
     if args.debug:
+        trace['retrieval_plan'] = plan.to_dict()
+        trace['discovery'] = discovery
+        trace['stage_timings'] = retrieval_timings
         result['retrieval_debug'] = trace
         emit('Debug trace saved to: ' + str(args.output))
     save(args.output, result)
