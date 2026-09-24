@@ -1,3 +1,7 @@
+# v1.3.0 update
+
+Hybrid local retrieval, evidence budgeting, diagnostics and rollback controls are documented in [RELEASE_v1.3.0.md](RELEASE_v1.3.0.md). The validation record is in [V130_IMPLEMENTATION.md](V130_IMPLEMENTATION.md).
+
 # Offline History AI
 
 A conversational history assistant using your local Wikipedia archive and local Qwen models.

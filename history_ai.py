@@ -109,8 +109,15 @@ def build(args):
     if not chunks:
         raise ValueError('No chunks extracted')
     api = client()
+    dense_error = None
+    try:
+        digest = model_digest(api, args.embed_model)
+    except Exception as error:
+        if isinstance(error, (InterruptedError, KeyboardInterrupt)) or not getattr(args, 'allow_dense_failure', False): raise
+        digest = None
+        dense_error = type(error).__name__
     metadata = dict(schema_version=1, embedding_model=args.embed_model,
-                    model_digest=model_digest(api, args.embed_model), variant=args.variant,
+                    model_digest=digest, variant=args.variant,
                     max_chars=args.max_chars, overlap_chars=args.overlap_chars,
                     articles=indexed_articles, zim_path=str(args.zim),
                     zim_size=args.zim.stat().st_size, zim_mtime_ns=args.zim.stat().st_mtime_ns,
@@ -124,21 +131,28 @@ def build(args):
         metadata['structured_extractor_sha256'] = hashlib.sha256((ROOT/'structured_wikipedia.py').read_bytes()).hexdigest()
     cache = ROOT / '.cache/embeddings'
     vectors = []
-    for n, chunk in enumerate(chunks, 1):
-        text = embedding_text(chunk, args.variant)
-        key = fingerprint([metadata['model_digest'], text])
-        path = cache / (key + '.json')
-        if path.exists():
-            vector = read(path)
-        else:
-            vector = api.embed(model=args.embed_model, input=text, truncate=False)['embeddings'][0]
-            normalize(vector)
-            save(path, vector)
-        vectors.append(vector)
-        if not getattr(args, 'quiet', False):
-            print(f'Embedded/cached {n}/{len(chunks)}', flush=True)
+    try:
+        if dense_error: raise ValueError(dense_error)
+        for n, chunk in enumerate(chunks, 1):
+            text = embedding_text(chunk, args.variant)
+            key = fingerprint([metadata['model_digest'], text])
+            path = cache / (key + '.json')
+            if path.exists():
+                vector = read(path)
+            else:
+                vector = api.embed(model=args.embed_model, input=text, truncate=False)['embeddings'][0]
+                normalize(vector)
+                save(path, vector)
+            vectors.append(vector)
+            if not getattr(args, 'quiet', False):
+                print(f'Embedded/cached {n}/{len(chunks)}', flush=True)
+    except Exception as error:
+        if isinstance(error, (InterruptedError, KeyboardInterrupt)) or not getattr(args, 'allow_dense_failure', False): raise
+        vectors = []
+        dense_error = type(error).__name__
     index = dict(metadata=metadata, chunks=chunks, vectors=vectors)
     index['index_id'] = fingerprint(index)
+    if dense_error: index['dense_error'] = dense_error
     if skipped_articles:
         index['skipped_articles'] = skipped_articles
     load_index_value(index)
@@ -151,6 +165,8 @@ def load_index_value(index):
     if index['index_id'] != fingerprint({k: index[k] for k in ('metadata', 'chunks', 'vectors')}):
         raise ValueError('Index fingerprint mismatch')
     chunks, vectors = index['chunks'], index['vectors']
+    if index.get('dense_error') and chunks and not vectors:
+        return index
     if not chunks or len(chunks) != len(vectors):
         raise ValueError('Invalid index lengths')
     if len({c['chunk_id'] for c in chunks}) != len(chunks):
@@ -292,23 +308,35 @@ def evidence_context(hits, max_chars):
 
 def generate(question, hits, model, api, max_chars=12000, num_predict=600,
              analysis=None, config=None, debug=False):
-    if config is None:
+    hybrid = config is not None and config.retrieval_mode == 'hybrid'
+    generation_system = SYSTEM
+    if hybrid:
+        generation_system += '\nKeep the complete answer under 280 words. Use short parallel comparisons and omit repetitive conclusions. Distinguish similarly named events and their dates explicitly; do not mix a precursor revolution with the revolution being compared. Do not infer motives or causes from subsequent achievements, military skills, or outcomes. State when the supplied evidence does not explain a requested causal link or sequence.'
+    packing_trace = None
+    if config is not None and config.retrieval_mode == 'hybrid':
+        from evidence_packing import pack
+        # Timeline instructions/schema have a bounded reservation, recounted below.
+        reserve = 700 if analysis is not None and analysis.effective_type == 'timeline' else 0
+        context, sources, packing_trace = pack(question, hits, analysis, config, max_chars, num_predict, generation_system, reserve)
+    elif config is None:
         context, sources = evidence_context(hits, max_chars)
     else:
         from answer_context import pack_context
         context, sources = pack_context(hits, min(max_chars, config.context_chars), config.context_token_budget)
     if not sources:
-        return dict(answer='The evidence is insufficient to answer this question.', sources=[],
+        empty = dict(answer='The evidence is insufficient to answer this question.', sources=[],
                     citation_check={'cited_labels': [], 'unknown_labels': [], 'has_citations': False},
                     wall_seconds=0, model=model, skipped_generation=True,
                     usage=normalize_usage(model=model, skipped=True))
+        if debug and packing_trace is not None: empty['generation_debug'] = {'packing': packing_trace}
+        return empty
     digest = model_digest(api, model)
     dialogue = ''
     if analysis is not None:
         dialogue = f'\nANSWER TYPE: {analysis.effective_type}\n'
         if analysis.context_summary:
             dialogue += 'CONVERSATION CONTEXT (unverified, only for resolving references):\n' + analysis.context_summary + '\n'
-    messages = [{'role': 'system', 'content': SYSTEM},
+    messages = [{'role': 'system', 'content': generation_system},
                 {'role': 'user', 'content': f'QUESTION:\n{question}\n{dialogue}\nEVIDENCE:\n{context}'}]
     timeline_output = analysis is not None and analysis.effective_type == 'timeline' and all(
         'sortable_date' in source for source in sources)
@@ -320,6 +348,12 @@ def generate(question, hits, model, api, max_chars=12000, num_predict=600,
                      'required': ['source_label', 'summary'], 'additionalProperties': False}}},
             'required': ['entries'], 'additionalProperties': False}
         messages[0]['content'] += '\nReturn JSON entries with source_label and a short event summary. Select at most 10 major events across the available range. Write one complete summary of at most 15 words per entry; do not copy whole source sentences. Use bare labels like S1, not brackets. Summarize only the Dated passage, not its preceding context. Do not generate dates; the application uses each cited source date.'
+    if packing_trace is not None:
+        from evidence_packing import prompt_estimate, CONTEXT_LIMIT, SAFETY_MARGIN
+        full_estimate = prompt_estimate(messages, extra)
+        packing_trace['full_prompt_estimate'] = full_estimate
+        if full_estimate + num_predict + SAFETY_MARGIN > CONTEXT_LIMIT:
+            raise ValueError('The assembled prompt exceeds the local context budget; shorten the question or history')
     started = time.perf_counter()
     response = api.chat(model=model, think=False, keep_alive=0,
                         options={'temperature': 0, 'seed': 42, 'num_predict': num_predict, 'num_ctx': 8192},
@@ -377,6 +411,7 @@ def generate(question, hits, model, api, max_chars=12000, num_predict=600,
                         'answer_relevance': None, 'appropriate_abstention': None})
     if debug:
         result['generation_debug'] = {'final_context': context, 'messages': messages, 'raw_model_answer': raw_answer}
+        if packing_trace is not None: result['generation_debug']['packing'] = packing_trace
     return result
 
 
@@ -390,7 +425,7 @@ def ask(args):
     from timeline_utils import extract_events, event_hits, infer_period
     config = load_config(getattr(args, 'config', None))
     state = getattr(args, 'conversation', None)
-    analysis = analyze(args.question, state)
+    analysis = analyze(args.question, state, enhanced=config.retrieval_mode == 'hybrid')
     if analysis.clarification:
         result = dict(question=args.question, answer=analysis.clarification, clarification=True,
                       analysis=analysis.to_dict(), sources=[],
@@ -430,7 +465,8 @@ def ask(args):
                   embed_model='nomic-embed-text', variant='title', index=path,
                   quiet=True, structured=True, skip_bad_articles=True,
                   candidate_chunks_per_article=config.candidate_chunks_per_article,
-                  candidate_chunks_total=config.candidate_chunks_total))
+                  candidate_chunks_total=config.candidate_chunks_total,
+                  allow_dense_failure=config.retrieval_mode == 'hybrid'))
             index = load_index_value(read(path))
             retrieval_timings['indexing_seconds'] = time.perf_counter()-stage_started
         else:
@@ -441,10 +477,18 @@ def ask(args):
     hits, trace, events = [], {}, []
     if index:
         stage_started = time.perf_counter()
-        hits, trace = expand(index, analysis, config, api, plan, discovery)
+        if config.retrieval_mode == 'hybrid':
+            from hybrid_retrieval import retrieve_hybrid
+            hits, trace = retrieve_hybrid(index, analysis, config, api, plan, discovery)
+        else:
+            hits, trace = expand(index, analysis, config, api, plan, discovery)
         retrieval_timings['ranking_seconds'] = time.perf_counter()-stage_started
         if analysis.effective_type == 'timeline':
             bounds = infer_period(index, analysis, config)
+            if bounds is None and config.retrieval_mode == 'hybrid':
+                from hybrid_retrieval import endpoint_period
+                bounds = endpoint_period(index, analysis)
+                if bounds is not None: trace['timeline_bounds_method'] = 'dates in locally matched introductory sentence'
             trace['timeline_date_bounds'] = bounds
             pool = trace['timeline_candidates']
             if analysis.anchor_year is not None and discovery and discovery.get('matched_articles'):
@@ -458,8 +502,12 @@ def ask(args):
     if args.top_k is not None:
         hits = hits[:args.top_k]
     retrieval_timings['total_seconds'] = time.perf_counter()-retrieval_started
+    generation_config = config
+    if trace.get('mode') == 'legacy_fallback':
+        from dataclasses import replace
+        generation_config = replace(config, retrieval_mode='legacy')
     result = generate(args.question, hits, args.model, api, max_chars, args.num_predict,
-                      analysis=analysis, config=config, debug=args.debug)
+                      analysis=analysis, config=generation_config, debug=args.debug)
     result.update(question=args.question, index_id=index['index_id'] if index else None,
                   discovery=discovery, analysis=analysis.to_dict(), timeline_events=events,
                   retrieval_config=config.to_dict(),
@@ -471,6 +519,11 @@ def ask(args):
         trace['retrieval_plan'] = plan.to_dict()
         trace['discovery'] = discovery
         trace['stage_timings'] = retrieval_timings
+        if trace.get('mode') == 'hybrid':
+            from hybrid_retrieval import inspector
+            trace['packing'] = result.get('generation_debug', {}).get('packing', {})
+            trace['observed_usage'] = result.get('usage')
+            trace = inspector(trace, result.get('sources', []))
         result['retrieval_debug'] = trace
         emit('Debug trace saved to: ' + str(args.output))
     save(args.output, result)

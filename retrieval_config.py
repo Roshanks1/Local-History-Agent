@@ -7,6 +7,12 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class RetrievalConfig:
+    retrieval_mode: str = "legacy"
+    rerank_backend: str = "deterministic"
+    hybrid_branch_k: int = 40
+    hybrid_merge_k: int = 80
+    hybrid_rerank_k: int = 80
+    hybrid_pack_k: int = 12
     candidate_articles: int = 12
     narrow_candidate_articles: int = 2
     max_seed_queries: int = 4
@@ -45,13 +51,18 @@ class RetrievalConfig:
 
     def __post_init__(self):
         for key, value in asdict(self).items():
-            if key in ('similarity_threshold', 'section_boost', 'article_boost',
+            if key in ('retrieval_mode', 'rerank_backend'):
+                allowed = ('legacy', 'hybrid') if key == 'retrieval_mode' else ('deterministic', 'rrf')
+                if value not in allowed: raise ValueError(f'Invalid {key}')
+            elif key in ('similarity_threshold', 'section_boost', 'article_boost',
                        'rerank_relevance_floor', 'redundancy_penalty',
                        'article_repeat_penalty', 'duplicate_overlap_threshold'):
                 if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or not 0 <= value <= 1:
                     raise ValueError(f'{key} must be between 0 and 1')
             elif not isinstance(value, int) or isinstance(value, bool) or value < 1:
                 raise ValueError(f'{key} must be a positive integer')
+        if self.candidate_chunks_total > 480 or self.hybrid_branch_k > 40 or self.hybrid_merge_k > 80 or self.hybrid_rerank_k > 80 or self.hybrid_pack_k > 12:
+            raise ValueError('Retrieval limits exceed the validated bounded universe')
         if self.context_token_budget > 5600:
             raise ValueError('context_token_budget must be <= 5600 to reserve generation/history space')
         if self.history_chars > 3000:

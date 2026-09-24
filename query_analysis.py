@@ -18,7 +18,7 @@ class QueryAnalysis:
         return asdict(self)
 
 
-def detect_type(question):
+def detect_type(question, enhanced=False):
     q = question.lower()
     if re.search(r'\b(timeline|chronolog\w*)\b|when did .*events|what happened between|what happened (?:next|after)', q):
         return 'timeline'
@@ -38,7 +38,7 @@ def contextual(question):
                 or q.rstrip('?! .') in ('why', 'how', 'when', 'why not'))
 
 
-def analyze(question, state=None):
+def analyze(question, state=None, enhanced=False):
     question = question.strip()
     if state is not None and state.clarification_options:
         options = state.clarification_options
@@ -56,8 +56,16 @@ def analyze(question, state=None):
             state.ambiguous_topics = []
             return QueryAnalysis(question, 'What happened after ' + choice + '?', 'followup', 'timeline',
                                  True, context_summary='The user clarified the event: ' + choice)
-    kind = detect_type(question)
+    kind = detect_type(question, enhanced)
     follow = contextual(question)
+    # A named subject in this question takes precedence over a pronoun within it.
+    # Pronoun-only questions still require bounded conversational context.
+    if follow and enhanced:
+        from retrieval_planning import extract_entities
+        pronoun = re.search(r'\b(that|those|these|it|its|he|she|they|their|them|his|her)\b', question, re.I)
+        explicit = extract_entities(question[:pronoun.start()] if pronoun else question)
+        if any(e.reason == 'question' and e.normalized_name not in ('republic', 'war') for e in explicit):
+            follow = False
     result = QueryAnalysis(question, question, 'followup' if follow else kind, kind, follow)
     if not follow:
         return result

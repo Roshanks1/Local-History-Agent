@@ -1,0 +1,641 @@
+{
+  "version": "v130-frozen-1",
+  "judgment_status": "Partial passage judgments, locally reviewed before hybrid scoring. Exact normalized spans accept overlapping chunks and alternate listed passages; unjudged passages are not proven irrelevant. No claim of exhaustive gold. H01/H02 held out from ranking tuning.",
+  "gates": {
+    "minimum_gain": 0.05,
+    "category_regression_limit": 0.02,
+    "warm_median_ratio": 1.5,
+    "warm_max_ratio": 2.0,
+    "memory_model_gib": 20,
+    "memory_eval_gib": 2
+  },
+  "questions": [
+    {
+      "id": "E01",
+      "category": "exact",
+      "question": "In what year was Magna Carta first sealed?",
+      "facets": [
+        {
+          "name": "first sealing",
+          "accepted_spans": [
+            "15 June 1215"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Magna_Carta",
+              "section": "Introduction",
+              "chunk_at_review": "Magna_Carta_000",
+              "text_sha256": "438f49999c537ad022671795bb392d415c7fb095cf60de05967ba467ce18200a"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E02",
+      "category": "exact",
+      "question": "When did the Battle of Lützen in which Gustavus Adolphus died take place?",
+      "facets": [
+        {
+          "name": "death at Lutzen",
+          "accepted_spans": [
+            "6 November 1632"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Gustavus_Adolphus",
+              "section": "Death and aftermath",
+              "chunk_at_review": "Gustavus_Adolphus_011",
+              "text_sha256": "b3447f30c99ae294c60abe9f9cccb117ff34b5ed6deb6656e81cb6675a0d4752"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E03",
+      "category": "entity",
+      "question": "What role did Toussaint Louverture play in the Haitian Revolution?",
+      "facets": [
+        {
+          "name": "leadership",
+          "accepted_spans": [
+            "most prominent leader of the Haitian Revolution",
+            "as a leader in an increasingly formal alliance"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Introduction",
+              "chunk_at_review": "Toussaint_Louverture_000",
+              "text_sha256": "17663b35fae6c7a6d4ae5fade706f031e08211ff0437c1d0cc01563cf34c0bd0"
+            },
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Haitian Revolution",
+              "chunk_at_review": "Toussaint_Louverture_017",
+              "text_sha256": "af68cdbf269558f4de60d3cda180b14ffc61b2f9def343adc3609a0954cb1922"
+            },
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Haitian Revolution",
+              "chunk_at_review": "Toussaint_Louverture_018",
+              "text_sha256": "86c3b02a03c11a2d3fdca519a8fc35b38146685aa9beb41e39ecb59fce086ef8"
+            }
+          ]
+        },
+        {
+          "name": "early role",
+          "accepted_spans": [
+            "began his military career as a lieutenant",
+            "join his forces as a secretary and lieutenant"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Introduction",
+              "chunk_at_review": "Toussaint_Louverture_000",
+              "text_sha256": "17663b35fae6c7a6d4ae5fade706f031e08211ff0437c1d0cc01563cf34c0bd0"
+            },
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Introduction",
+              "chunk_at_review": "Toussaint_Louverture_001",
+              "text_sha256": "56c896db718e179a7c4c57862e7b843cd5c029f82c750a094613e2dfbddf2000"
+            },
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Haitian Revolution",
+              "chunk_at_review": "Toussaint_Louverture_014",
+              "text_sha256": "211a98678175504187c3abc68fc737e2e91718dde95f65428abafb9e5f4c10fd"
+            },
+            {
+              "article": "Toussaint_Louverture",
+              "section": "Haitian Revolution",
+              "chunk_at_review": "Toussaint_Louverture_015",
+              "text_sha256": "62e093f9516a854c11b5277701beebf556a839b06aa0aa4c13588e22fa7adb17"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B01",
+      "category": "causal",
+      "question": "Why did the Roman Republic collapse?",
+      "facets": [
+        {
+          "name": "structural conflict",
+          "accepted_spans": [
+            "Rome’s expansion destabilised",
+            "Rome's expansion destabilised"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Roman_Republic",
+              "section": "History",
+              "chunk_at_review": "Roman_Republic_029",
+              "text_sha256": "b11764465161842f5ffdc81016c76c598b5736fb6bc8d3f08f0ada51bef52135"
+            }
+          ]
+        },
+        {
+          "name": "institutions and armies",
+          "accepted_spans": [
+            "institutions lost their credibility",
+            "stronger ties between a general and his troops"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Crisis_of_the_Roman_Republic",
+              "section": "History",
+              "chunk_at_review": "Crisis_of_the_Roman_Republic_011",
+              "text_sha256": "8eff247f74a0d8422ce00938580dbc537aa1467fdb8fab523758855329b5d691"
+            },
+            {
+              "article": "Crisis_of_the_Roman_Republic",
+              "section": "History",
+              "chunk_at_review": "Crisis_of_the_Roman_Republic_012",
+              "text_sha256": "23d06ed28703304a9e78e9668258419118a8536fed35bc616c2fe0c908b51255"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B02",
+      "category": "causal",
+      "question": "What caused the Thirty Years’ War, and why did it spread beyond Bohemia?",
+      "facets": [
+        {
+          "name": "religious settlement",
+          "accepted_spans": [
+            "settlement was undermined by the expansion of Protestantism",
+            "causes derived from religious conflict"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Thirty_Years'_War",
+              "section": "Introduction",
+              "chunk_at_review": "Thirty_Years'_War_000",
+              "text_sha256": "3eb8bf9d67bdd25cc1cd81942bbac49683f6ad18457591047a331412ca7f048e"
+            },
+            {
+              "article": "Thirty_Years'_War",
+              "section": "Structural origins",
+              "chunk_at_review": "Thirty_Years'_War_002",
+              "text_sha256": "e9918f9197a97c2a5c6bd82c73164e45753f104456b2313126eae92430b09c82"
+            }
+          ]
+        },
+        {
+          "name": "trigger",
+          "accepted_spans": [
+            "Third Defenestration of Prague"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Thirty_Years'_War",
+              "section": "History",
+              "chunk_at_review": "Thirty_Years'_War_008",
+              "text_sha256": "e7e030d2471d9c5581e4bda00f11de10055dd22832b35f1ad05156f7b484ac96"
+            }
+          ]
+        },
+        {
+          "name": "international escalation",
+          "accepted_spans": [
+            "strategic importance drew in the Dutch Republic and Spain",
+            "France’s entry into the war",
+            "France 's entry into the war"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Thirty_Years'_War",
+              "section": "Introduction",
+              "chunk_at_review": "Thirty_Years'_War_000",
+              "text_sha256": "3eb8bf9d67bdd25cc1cd81942bbac49683f6ad18457591047a331412ca7f048e"
+            },
+            {
+              "article": "Thirty_Years'_War",
+              "section": "Introduction",
+              "chunk_at_review": "Thirty_Years'_War_001",
+              "text_sha256": "71c774963938b76e32c4c0e081b9677bc77194aa81d14a256eb6d68aa762c363"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M01",
+      "category": "comparison",
+      "question": "Compare the causes of the French and Russian Revolutions.",
+      "facets": [
+        {
+          "name": "French fiscal crisis",
+          "accepted_spans": [
+            "tax rates varied widely from one region to another",
+            "social, economic, financial and political crisis"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "French_Revolution",
+              "section": "Causes",
+              "chunk_at_review": "French_Revolution_002",
+              "text_sha256": "bf99730fc6958011067f682d48cb188ae1d930d0d8efaa9472258528c07937b6"
+            },
+            {
+              "article": "French_Revolution",
+              "section": "Causes",
+              "chunk_at_review": "French_Revolution_003",
+              "text_sha256": "53cac624566314a93aa6cac76d9c07e5dfba19d0dd91328e4b189cd27489e856"
+            }
+          ]
+        },
+        {
+          "name": "Russian social conditions",
+          "accepted_spans": [
+            "centuries of oppression of the lower classes",
+            "overcrowded housing with often deplorable sanitary conditions"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Russian_Revolution",
+              "section": "Background",
+              "chunk_at_review": "Russian_Revolution_011",
+              "text_sha256": "be477355eef9807d426d914111779d98d020110b6eb8ecb8982db14c9bf98b57"
+            },
+            {
+              "article": "Russian_Revolution",
+              "section": "Background",
+              "chunk_at_review": "Russian_Revolution_012",
+              "text_sha256": "ae56af50d86b16b74e9f0361fa5b6a2695a3d158add2f3c181da4071926662b8"
+            }
+          ]
+        },
+        {
+          "name": "Russian wartime crisis",
+          "accepted_spans": [
+            "World War I added to the chaos",
+            "Russia's poor performance in 1914–1915"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Russian_Revolution",
+              "section": "Background",
+              "chunk_at_review": "Russian_Revolution_004",
+              "text_sha256": "5f2c2be08251200eb685ba37420809fe8a786de404e907b5afa95fe23811ff79"
+            },
+            {
+              "article": "Russian_Revolution",
+              "section": "Background",
+              "chunk_at_review": "Russian_Revolution_013",
+              "text_sha256": "49c49eb6b5d9e90b3610cb18ee7729857d37153411e52252e0f1f44c624196f4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M02",
+      "category": "comparison",
+      "question": "How did the Treaty of Versailles contribute to instability in the Weimar Republic?",
+      "facets": [
+        {
+          "name": "political resentment",
+          "accepted_spans": [
+            "resentment of the treaty",
+            "Treaty created much resentment",
+            "seen as an insult to the nation"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Treaty_of_Versailles",
+              "section": "Introduction",
+              "chunk_at_review": "Treaty_of_Versailles_002",
+              "text_sha256": "9fbc8da17621c2b955cf56e5acc0e8646770c73b6c6a02cb8fafcc68223d06af"
+            },
+            {
+              "article": "Treaty_of_Versailles",
+              "section": "Reactions",
+              "chunk_at_review": "Treaty_of_Versailles_037",
+              "text_sha256": "b91db3a6b01fc42db3b049808bf44ea91ee23bd8f29815e80bb7d16ac4dc350b"
+            },
+            {
+              "article": "Treaty_of_Versailles",
+              "section": "Historical assessments",
+              "chunk_at_review": "Treaty_of_Versailles_075",
+              "text_sha256": "05f6baf3a64c1a18d35cf0b8f98f92d14082aa13ccc0b50caf314e7ec310022a"
+            }
+          ]
+        },
+        {
+          "name": "monetary mechanism",
+          "accepted_spans": [
+            "printing of cash by the German government",
+            "printing money to pay"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Hyperinflation_in_the_Weimar_Republic",
+              "section": "Causes",
+              "chunk_at_review": "Hyperinflation_in_the_Weimar_Republic_012",
+              "text_sha256": "6ac72293ec198d798f353f4f962e7904fd76cc711b5d13bb663fb43a3771e620"
+            },
+            {
+              "article": "Hyperinflation_in_the_Weimar_Republic",
+              "section": "Causes",
+              "chunk_at_review": "Hyperinflation_in_the_Weimar_Republic_013",
+              "text_sha256": "c81a955557e7f159f86fb7b91cda5d24fbe7dd4fe61f8cff67aa0b1f9b7a5706"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "T01",
+      "category": "chronology",
+      "question": "What major events connected the assassination of Franz Ferdinand to the outbreak of World War I?",
+      "facets": [
+        {
+          "name": "ultimatum",
+          "accepted_spans": [
+            "ultimatum to be presented to Serbia on 23 July",
+            "ultimatum on 23 July"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "July_Crisis",
+              "section": "Austria-Hungary considers an ultimatum (7–23 July)",
+              "chunk_at_review": "July_Crisis_025",
+              "text_sha256": "c3bad9b3f0101a8d3b4ab69c67879bd68a07c66530c5bd088f43988e1c31999a"
+            }
+          ]
+        },
+        {
+          "name": "war on Serbia",
+          "accepted_spans": [
+            "declaration of war on 28 July",
+            "declared war on Serbia on 28 July"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "July_Crisis",
+              "section": "Full-blown crisis",
+              "chunk_at_review": "July_Crisis_045",
+              "text_sha256": "31631c7facaa9533151c344702cc3469fa459ca48674ca4cab039255261bb3ff"
+            }
+          ]
+        },
+        {
+          "name": "Britain enters",
+          "accepted_spans": [
+            "Britain entered the war against them on 4 August",
+            "Britain declared war on Germany on 4 August"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "July_Crisis",
+              "section": "Introduction",
+              "chunk_at_review": "July_Crisis_002",
+              "text_sha256": "11f21d189ff2f1e16bb8b792f531bfece88a1dc5195f9f86015e1b994981ed13"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "T02",
+      "category": "chronology",
+      "question": "Outline the sequence from the Estates-General to the abolition of the French monarchy.",
+      "facets": [
+        {
+          "name": "Estates-General",
+          "accepted_spans": [
+            "On 5 May 1789, the Estates-General convened",
+            "convocation of the Estates General in May 1789"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "French_Revolution",
+              "section": "Introduction",
+              "chunk_at_review": "French_Revolution_000",
+              "text_sha256": "40b84b7b5a11411a8b500e5ef3570351ecb5874d3d4e42fadcbc3bc224de25ad"
+            },
+            {
+              "article": "French_Revolution",
+              "section": "Crisis of the Ancien Régime",
+              "chunk_at_review": "French_Revolution_006",
+              "text_sha256": "1d1598598b0d9d2c2d08d8a9452cffeef7b73531847f09014afce5009fb1cd93"
+            },
+            {
+              "article": "French_Revolution",
+              "section": "Crisis of the Ancien Régime",
+              "chunk_at_review": "French_Revolution_007",
+              "text_sha256": "77d6819797ba56218dccb22b4ea656aeebe2be35600a4b78ef92643b810b1441"
+            }
+          ]
+        },
+        {
+          "name": "monarchy ends",
+          "accepted_spans": [
+            "monarchy was replaced by the French First Republic in September",
+            "abolition of the monarchy on 21 September"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "French_Revolution",
+              "section": "Introduction",
+              "chunk_at_review": "French_Revolution_000",
+              "text_sha256": "40b84b7b5a11411a8b500e5ef3570351ecb5874d3d4e42fadcbc3bc224de25ad"
+            },
+            {
+              "article": "French_Revolution",
+              "section": "Introduction",
+              "chunk_at_review": "French_Revolution_001",
+              "text_sha256": "4e362980bb2abd714d2ac89c42a0bbe9601643d62e552036e25df22770fecc23"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F01",
+      "category": "followup",
+      "question": "Why did Gustavus Adolphus intervene in the Thirty Years’ War?",
+      "facets": [
+        {
+          "name": "Protestant intervention",
+          "accepted_spans": [
+            "support and protect the Protestant side in Germany"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Gustavus_Adolphus",
+              "section": "King of Sweden",
+              "chunk_at_review": "Gustavus_Adolphus_005",
+              "text_sha256": "2cefd6afcba2c983dfccbc2f504f25e35a2c4cdf55ca8f164397af2eb95367cb"
+            },
+            {
+              "article": "Gustavus_Adolphus",
+              "section": "King of Sweden",
+              "chunk_at_review": "Gustavus_Adolphus_006",
+              "text_sha256": "3a3155ca53426901b62c7ea42ebdb6781df68f671472e9043a6e51e2ca1e59a4"
+            }
+          ]
+        },
+        {
+          "name": "anti-imperial policy",
+          "accepted_spans": [
+            "Gustavus Adolphus intervened on the anti-Imperial side"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Gustavus_Adolphus",
+              "section": "King of Sweden",
+              "chunk_at_review": "Gustavus_Adolphus_005",
+              "text_sha256": "2cefd6afcba2c983dfccbc2f504f25e35a2c4cdf55ca8f164397af2eb95367cb"
+            },
+            {
+              "article": "Gustavus_Adolphus",
+              "section": "King of Sweden",
+              "chunk_at_review": "Gustavus_Adolphus_006",
+              "text_sha256": "3a3155ca53426901b62c7ea42ebdb6781df68f671472e9043a6e51e2ca1e59a4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "category": "followup",
+      "question": "How did Sulla’s reforms affect the Roman Republic after his death?",
+      "facets": [
+        {
+          "name": "constitutional structure",
+          "accepted_spans": [
+            "a weakening of the plebeian tribunate",
+            "Tribunes were banned from introducing legislation"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Sulla",
+              "section": "Dictatorship and constitutional reforms",
+              "chunk_at_review": "Sulla_037",
+              "text_sha256": "47536581ae3b480885f4f023b72a4d71b6fd460f706c862b6bcfb4b16a888543"
+            },
+            {
+              "article": "Sulla",
+              "section": "Dictatorship and constitutional reforms",
+              "chunk_at_review": "Sulla_038",
+              "text_sha256": "c6d36ba861cb8dee3167ed99d19e5079a055959fca10524a0e9f52e5f24c2f9c"
+            },
+            {
+              "article": "Sulla",
+              "section": "Dictatorship and constitutional reforms",
+              "chunk_at_review": "Sulla_039",
+              "text_sha256": "559e89e06a1bbef797b67e0f11218990966a4050e645aeab4f0b89a33603c990"
+            }
+          ]
+        },
+        {
+          "name": "aftermath",
+          "accepted_spans": [
+            "bulk of the reforms, however, quickly proved unworkable",
+            "much of his legislation was repealed less than a decade after his death"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Sulla",
+              "section": "Dictatorship and constitutional reforms",
+              "chunk_at_review": "Sulla_041",
+              "text_sha256": "f8b6be50af703dea4f859743359a4fa5272cfe56360345ae6bbd1b58ef4376f9"
+            },
+            {
+              "article": "Sulla",
+              "section": "Legacy",
+              "chunk_at_review": "Sulla_045",
+              "text_sha256": "399fda8019c374e678545744416c5fafbd8fd0dfd35e1fa222f49dc5e6df9bbe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H01",
+      "category": "heldout",
+      "question": "When was the Edict of Nantes revoked?",
+      "facets": [
+        {
+          "name": "revocation date",
+          "accepted_spans": [
+            "In October 1685, Louis XIV",
+            "18 October 1685"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Edict_of_Nantes",
+              "section": "Revocation",
+              "chunk_at_review": "Edict_of_Nantes_006",
+              "text_sha256": "a0aa0dd8d22919423fc5c45759ed387c4f4b898d3b766d5f48ce58eae634f80c"
+            },
+            {
+              "article": "Edict_of_Nantes",
+              "section": "Revocation",
+              "chunk_at_review": "Edict_of_Nantes_007",
+              "text_sha256": "84f59817fcb430ae7d7c914384c68ca70a57fda24130b8c5dc16c120088bfb74"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H02",
+      "category": "heldout",
+      "question": "What caused the Haitian Revolution?",
+      "facets": [
+        {
+          "name": "coercive slave economy",
+          "accepted_spans": [
+            "manual labor provided by enslaved Africans"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Haitian_Revolution",
+              "section": "Background",
+              "chunk_at_review": "Haitian_Revolution_002",
+              "text_sha256": "ce4281c1386c51be1c607272df05764a0b8658cc69871685027b472bc8387546"
+            }
+          ]
+        },
+        {
+          "name": "equality and racial conflict",
+          "accepted_spans": [
+            "grant citizenship to wealthy free people of color in May 1791",
+            "influenced the desire for freedom and equality in Saint-Domingue"
+          ],
+          "verified_local_sources": [
+            {
+              "article": "Haitian_Revolution",
+              "section": "Effects of the French Revolution",
+              "chunk_at_review": "Haitian_Revolution_013",
+              "text_sha256": "4bd2e7033d8a75236dbe872a2ad8ac7f3ac24df352dd88b685f8e0dd77188126"
+            },
+            {
+              "article": "Haitian_Revolution",
+              "section": "1791 slave rebellion",
+              "chunk_at_review": "Haitian_Revolution_015",
+              "text_sha256": "d7d6f8a763a5f880613782cbda725077cc005a7d24e1473bda64dd7f3f1ac2fc"
+            },
+            {
+              "article": "Haitian_Revolution",
+              "section": "1791 slave rebellion",
+              "chunk_at_review": "Haitian_Revolution_016",
+              "text_sha256": "1325abcd77b441af377ea3ee2235e68ce4939f49b8b68c0ffc2a2ea4e0d3b13d"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -265,7 +265,7 @@ class QuietDiscoveryTests(unittest.TestCase):
         import history_ai
         with tempfile.TemporaryDirectory() as directory:
             args = argparse.Namespace(question='What caused the Thirty Years War?', model='qwen3:14b', conversation=None, config=None, index=None, top_k=None, context_chars=None, num_predict=600, debug=False, quiet=True, output=Path(directory)/'answer.json')
-            with patch('wikipedia_local.LocalWikipedia'), patch('article_discovery.discover', return_value={'articles':['Thirty_Years_War']}), patch('history_ai.build') as build, patch('history_ai.read', return_value={}), patch('history_ai.load_index_value', return_value={'index_id':'test'}), patch('history_ai.client'), patch('retrieval_expansion.expand', return_value=([],{})):
+            with patch('wikipedia_local.LocalWikipedia'), patch('article_discovery.discover', return_value={'articles':['Thirty_Years_War']}), patch('history_ai.build') as build, patch('history_ai.read', return_value={}), patch('history_ai.load_index_value', return_value={'index_id':'test','chunks':[],'metadata':{}}), patch('history_ai.client'), patch('retrieval_expansion.expand', return_value=([],{})):
                 output=io.StringIO()
                 with redirect_stdout(output):
                     result=history_ai.ask(args)

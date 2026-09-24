@@ -49,9 +49,34 @@ class ConversationStore:
             FROM conversations WHERE id=?''', (identifier,)).fetchone()
         if row is None or (row['archived'] and not include_archived):
             raise ValueError('Saved conversation not found. Choose another conversation or start a new one.')
+        try:
+            state = ConversationState(**json.loads(row['state']))
+            turns = json.loads(row['turns'])
+            if not isinstance(turns, list):
+                raise ValueError()
+            for turn in turns:
+                if not isinstance(turn, dict) or not isinstance(turn.get('question'), str):
+                    raise ValueError()
+                result = turn.get('result')
+                if not isinstance(result, dict) or not isinstance(result.get('answer'), str):
+                    raise ValueError()
+                sources = result.get('sources') or []
+                if not isinstance(sources, list) or any(not isinstance(s, dict) for s in sources):
+                    raise ValueError()
+            if not isinstance(state.turns, list) or any(not isinstance(t, dict) or
+                    not all(isinstance(t.get(k), str) for k in ('question', 'answer_summary')) for t in state.turns):
+                raise ValueError()
+            for name in ('entities', 'periods', 'events', 'articles', 'ambiguous_topics', 'clarification_options'):
+                if not isinstance(getattr(state, name), list) or any(not isinstance(v, str) for v in getattr(state, name)):
+                    raise ValueError()
+            if not isinstance(state.focus, str) or not isinstance(state.effective_type, str):
+                raise ValueError()
+            if any(type(v) is not int or v <= 0 for v in (state.max_turns, state.max_chars)):
+                raise ValueError()
+        except (ValueError, TypeError, KeyError):
+            raise ValueError('This saved conversation could not be read. Choose another conversation or start a new one.') from None
         return dict(id=identifier, title=row['title'], created=row['created'], updated=row['updated'],
-                    archived=bool(row['archived']), revision=row['revision'],
-                    state=ConversationState(**json.loads(row['state'])), turns=json.loads(row['turns']))
+                    archived=bool(row['archived']), revision=row['revision'], state=state, turns=turns)
 
     def save(self, conversation):
         now = time.time()

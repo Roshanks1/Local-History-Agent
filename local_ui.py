@@ -2,6 +2,8 @@
 import argparse
 from collections import OrderedDict
 import json
+import httpx
+import ollama
 import secrets
 import threading
 import time
@@ -65,7 +67,7 @@ class Application:
                 else:
                     source['article_url'] = fallback
                     source['evidence_status'] = 'section' if urlsplit(fallback).fragment else 'article'
-            except (KeyError, ValueError, RuntimeError):
+            except (KeyError, ValueError, RuntimeError, OSError):
                 source['article_url'] = None
                 source['evidence_status'] = 'unavailable'
             # The UI needs only the bounded excerpt, not the full generation chunk.
@@ -115,10 +117,13 @@ class Application:
                     state=ConversationState(max_turns=config.history_turns, max_chars=config.history_chars))
             else:
                 saved = self.store.load(sid)
-            result = self.answer(argparse.Namespace(question=question.strip(), model=model,
-                conversation=saved['state'], config=None, index=None, top_k=None, context_chars=None,
-                num_predict=600, debug=data.get('debug') is True, quiet=True,
-                output=ROOT/'artifacts'/'ui'/f'{time.time_ns()}-{secrets.token_hex(4)}.json'))
+            try:
+                result = self.answer(argparse.Namespace(question=question.strip(), model=model,
+                    conversation=saved['state'], config=None, index=None, top_k=None, context_chars=None,
+                    num_predict=600, debug=data.get('debug') is True, quiet=True,
+                    output=ROOT/'artifacts'/'ui'/f'{time.time_ns()}-{secrets.token_hex(4)}.json'))
+            except ValueError:
+                raise RuntimeError('Local generation or retrieval failed') from None
             saved['turns'].append(dict(question=question.strip(), result=result))
             self.store.save(saved)
             return dict(session=sid, result=self.source_links(result))
@@ -190,6 +195,14 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
             result = self.server.app.run(data)
             self.reply(200, result)
+        except (ConnectionError, httpx.ConnectError):
+            self.reply(503, {'error': 'Unable to connect to the local language model. Make sure Ollama is running and try again.'})
+        except httpx.TimeoutException:
+            self.reply(503, {'error': 'The local language model took too long to respond. Please try again.'})
+        except ollama.ResponseError:
+            self.reply(503, {'error': 'The local language model could not complete the answer. Check that the configured models are installed in Ollama and try again.'})
+        except FileNotFoundError:
+            self.reply(503, {'error': 'A required local file is unavailable. Check the Wikipedia archive and try again.'})
         except (ValueError, UnicodeError) as error:
             self.reply(400, {'error': str(error)})
         except Exception:
@@ -208,6 +221,8 @@ def main():
     args = parser.parse_args()
     if not 0 <= args.port <= 65535:
         parser.error('Port must be 0–65535')
+    if not ZIM_PATH.is_file():
+        parser.exit(1, 'Local Wikipedia archive unavailable. Restore data/wikipedia/wikipedia_en_all_nopic_2026-06.zim and restart the app.\n')
     from libzim.reader import Archive
     try:
         server = make_server(args.port, Application(OfflineReader(Archive(str(ZIM_PATH))), store_path=ROOT/'data'/'conversations.sqlite3'))

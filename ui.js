@@ -1,19 +1,24 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let session = null, token = null, conversations = [], pendingArchive = null;
-let previewSequence = 0;
+let previewSequence = 0, inFlight = false;
 
 function element(tag, text, cls) {
  const value=document.createElement(tag); value.textContent=text;
  if(cls)value.className=cls; return value;
 }
 function busy(value) {
+ inFlight=value;
+ $('form').setAttribute('aria-busy',String(value));
  for(const control of document.querySelectorAll('button,textarea,select'))control.disabled=value;
  $('conversation-search').disabled=value;
 }
 async function request(data) {
- const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify({session,...data})});
- const body=await response.json();
+ let response;
+ try{response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify({session,...data})});}
+ catch{throw Error('Unable to reach the local app. Check that it is running and try again.');}
+ let body;
+ try{body=await response.json();}catch{throw Error('The local app returned an unreadable response. Please try again.');}
  if(!response.ok)throw Error(body.error || 'Request failed');
  if('session' in body){
   session=body.session;
@@ -107,13 +112,14 @@ function display(question,result,scroll=true) {
  if(usage)card.append(element('p',usage.skipped?'Generation skipped; no final model call.':`${usage.model} · Context window: ${usage.context_window} tokens · Prompt: ${usage.prompt_tokens ?? 'unavailable'} · Output: ${usage.output_tokens ?? 'unavailable'} · Total: ${usage.total_tokens ?? 'unavailable'}`,'usage'));
  if(result.done_reason==='length')card.append(element('p','Answer reached the output limit and may be incomplete.'));
  const sources=element('div','','sources');
- for(const source of result.sources){
+ for(const source of result.sources || []){
   const link=sourceLink(source,`[${source.label}] ${source.article_title || source.article_path.replaceAll('_',' ')}`,'source');
   const destination=source.evidence_status==='exact'?'Read highlighted evidence ↗':source.evidence_status==='section'?'Exact passage unavailable; showing cited section ↗':source.evidence_status==='article'?'Exact passage unavailable; showing article ↗':'Article unavailable in archive';
   link.append(element('small',sourceSection(source)),element('span',source.preview_excerpt || 'Supporting excerpt unavailable for this saved answer.','source-excerpt'),element('small',destination,'source-destination'));
   sources.append(link);
  }
- card.append(sources);
+ if(sources.childElementCount){card.append(element('h3','Sources','sources-heading'),sources);}
+ else if(!result.clarification)card.append(element('p','No supporting sources were found in the local archive. Try a more specific question.','empty-sources'));
  if(result.retrieval_debug || result.generation_debug){
   const detail=element('details','');
   detail.append(element('summary','Debug trace'),element('pre',JSON.stringify({retrieval:result.retrieval_debug,generation:result.generation_debug},null,2)));
@@ -146,11 +152,13 @@ function renderSaved() {
   row.append(open,actions); $('saved').append(row);
  }
  $('no-saved').hidden=matches.length>0;
+ $('no-saved').textContent=query?'No conversations match your search.':'No saved conversations yet.';
 }
 async function refreshSaved() {
  const data=await request({action:'list'}); conversations=data.conversations; renderSaved();
 }
 async function openSaved(id) {
+ $('status').textContent='Loading saved conversation and local source links…';
  const data=await request({action:'open',session:id});
  $('conversation').replaceChildren();
  $('chat-scroll').scrollTop=0;
@@ -172,12 +180,13 @@ async function exportSaved(id) {
 }
 
 $('form').addEventListener('submit',async event=>{
- event.preventDefault(); const question=$('question').value.trim(); if(!question)return;
+ event.preventDefault(); if(inFlight)return; const question=$('question').value.trim(); if(!question)return;
  busy(true); $('status').textContent='Searching local Wikipedia and preparing an answer…';
  try{
   const data=await request({question,model:$('model').value,debug:$('debug').checked});
   if(data.reset)$('conversation').replaceChildren(); else display(question,data.result);
-  $('question').value=''; await refreshSaved(); $('status').textContent=data.reset?'Started a fresh conversation.':'';
+  $('question').value=''; $('status').textContent=data.reset?'Started a fresh conversation.':'Answer ready.';
+  try{await refreshSaved();}catch{$('status').textContent='Answer saved, but the conversation list could not refresh. Reload to try again.';}
  }catch(error){$('status').textContent=error.message;}finally{busy(false);}
 });
 $('new').addEventListener('click',async()=>{
